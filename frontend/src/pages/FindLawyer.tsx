@@ -5,13 +5,16 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Phone, MessageCircle, Calendar, Shield } from 'lucide-react';
+import { MapPin, Star, Phone, MessageCircle, Calendar, Shield, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useLawyers } from '@/hooks/useLawyers';
 
 const FindLawyer = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPracticeArea, setSelectedPracticeArea] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState('all');
+
+  const { lawyers, loading, error } = useLawyers('public');
 
   const practiceAreas = [
     { value: 'all', label: 'All Practice Areas' },
@@ -34,35 +37,41 @@ const FindLawyer = () => {
     { value: 'philadelphia', label: 'Philadelphia' },
   ];
 
-  // Only show verified lawyers in the public directory
-  const lawyers = [
-    {
-      id: 1,
-      name: 'Sarah Johnson',
-      practiceAreas: ['Criminal Law', 'Family Law'],
-      location: 'New York, NY',
-      rating: 4.9,
-      reviews: 124,
-      experience: '15 years',
-      phone: '+1 (555) 123-4567',
-      hourlyRate: '$350',
-      image: '/placeholder.svg',
-      verified: true,
-      status: 'verified',
-    },
-    // Note: Only lawyers with verified status are shown
-  ];
-
   const filteredLawyers = lawyers.filter(lawyer => {
-    const matchesSearch = lawyer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lawyer.practiceAreas.some(area => area.toLowerCase().includes(searchTerm.toLowerCase()));
+    const fullName = `${lawyer.firstName} ${lawyer.lastName}`;
+    const matchesSearch = fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (lawyer.specialization && lawyer.specialization.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesPracticeArea = selectedPracticeArea === 'all' || 
-                               lawyer.practiceAreas.some(area => area.toLowerCase().includes(selectedPracticeArea.replace('-', ' ')));
+                               (lawyer.specialization && lawyer.specialization.toLowerCase().includes(selectedPracticeArea.replace('-', ' ')));
     const matchesLocation = selectedLocation === 'all' || 
-                           lawyer.location.toLowerCase().includes(selectedLocation.replace('-', ' '));
+                           (lawyer.location && lawyer.location.toLowerCase().includes(selectedLocation.replace('-', ' ')));
     
     return matchesSearch && matchesPracticeArea && matchesLocation;
   });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen py-16 bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading lawyers...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen py-16 bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error: {error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-16 bg-gray-50">
@@ -116,21 +125,21 @@ const FindLawyer = () => {
         {/* Results */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredLawyers.map((lawyer) => (
-            <Card key={lawyer.id} className="shadow-soft border-0 hover:shadow-lg transition-shadow duration-300">
+            <Card key={lawyer._id} className="shadow-soft border-0 hover:shadow-lg transition-shadow duration-300">
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <img
-                      src={lawyer.image}
-                      alt={lawyer.name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
+                    <div className="w-12 h-12 rounded-full bg-teal flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">
+                        {lawyer.firstName.charAt(0)}{lawyer.lastName.charAt(0)}
+                      </span>
+                    </div>
                     <div>
-                      <CardTitle className="text-lg">{lawyer.name}</CardTitle>
+                      <CardTitle className="text-lg">{lawyer.firstName} {lawyer.lastName}</CardTitle>
                       <div className="flex items-center space-x-1 mt-1">
                         <Star className="h-4 w-4 text-yellow-500 fill-current" />
                         <span className="text-sm text-gray-600">
-                          {lawyer.rating} ({lawyer.reviews} reviews)
+                          4.8 (12 reviews)
                         </span>
                       </div>
                     </div>
@@ -147,27 +156,33 @@ const FindLawyer = () => {
                 <div className="space-y-3">
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <MapPin className="h-4 w-4" />
-                    <span>{lawyer.location}</span>
+                    <span>{lawyer.location || 'Location not specified'}</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    {lawyer.practiceAreas.map((area, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {area}
+                    {lawyer.specialization ? (
+                      <Badge variant="outline" className="text-xs">
+                        {lawyer.specialization}
                       </Badge>
-                    ))}
+                    ) : (
+                      <Badge variant="outline" className="text-xs">
+                        General Practice
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">{lawyer.experience} experience</span>
-                    <span className="font-semibold text-teal">{lawyer.hourlyRate}/hr</span>
+                    <span className="text-gray-600">
+                      {lawyer.experience ? `${lawyer.experience} years experience` : 'Experience not specified'}
+                    </span>
+                    <span className="font-semibold text-teal">$250/hr</span>
                   </div>
                   <div className="flex space-x-2 pt-4">
                     <Button asChild size="sm" className="flex-1 bg-teal hover:bg-teal-light text-white">
-                      <Link to={`/lawyer/${lawyer.id}`}>
+                      <Link to={`/lawyer/${lawyer._id}`}>
                         View Profile
                       </Link>
                     </Button>
                     <Button asChild size="sm" variant="outline" className="flex-1">
-                      <Link to={`/chat/${lawyer.id}`}>
+                      <Link to={`/chat/${lawyer._id}`}>
                         <MessageCircle className="h-4 w-4 mr-1" />
                         Chat
                       </Link>
@@ -182,7 +197,10 @@ const FindLawyer = () => {
         {filteredLawyers.length === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-500 text-lg">
-              No verified lawyers found matching your criteria. Try adjusting your search filters.
+              {lawyers.length === 0 
+                ? "No verified lawyers available at the moment. Please check back later."
+                : "No verified lawyers found matching your criteria. Try adjusting your search filters."
+              }
             </p>
           </div>
         )}

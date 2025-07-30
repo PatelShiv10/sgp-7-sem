@@ -5,7 +5,8 @@ interface User {
   firstName: string;
   lastName: string;
   email: string;
-  userType: 'user' | 'lawyer';
+  userType: 'user' | 'lawyer' | 'admin';
+  id: string;
 }
 
 interface AuthContextType {
@@ -22,7 +23,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const storedUser = localStorage.getItem('currentUser');
-    if (storedUser) {
+    const token = localStorage.getItem('token');
+    
+    if (storedUser && token) {
       setUser(JSON.parse(storedUser));
     }
   }, []);
@@ -35,7 +38,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     setUser(null);
     localStorage.removeItem('currentUser');
+    localStorage.removeItem('token');
     localStorage.removeItem('lawyerProfileImage');
+    // Redirect to home page after logout
+    window.location.href = '/';
   };
 
   return (

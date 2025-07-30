@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Navbar } from "./components/Navbar";
 import { Footer } from "./components/Footer";
 import Index from "./pages/Index";
@@ -181,21 +182,69 @@ const App = () => (
                 </>
               } />
               
-              {/* Lawyer Panel Routes (No Navbar/Footer) */}
-              <Route path="/lawyer-dashboard" element={<LawyerDashboard />} />
-              <Route path="/lawyer-appointments" element={<LawyerAppointments />} />
-              <Route path="/lawyer-all-appointments" element={<LawyerAllAppointments />} />
-              <Route path="/lawyer-clients" element={<LawyerClients />} />
-              <Route path="/lawyer-messages" element={<LawyerMessages />} />
-              <Route path="/lawyer-video-calls" element={<LawyerVideoCalls />} />
-              <Route path="/lawyer-documents" element={<LawyerDocuments />} />
-              <Route path="/lawyer-profile" element={<LawyerProfile />} />
-              <Route path="/lawyer-payments" element={<LawyerPayments />} />
-              <Route path="/lawyer-reviews" element={<LawyerReviews />} />
-              <Route path="/lawyer-settings" element={<LawyerSettings />} />
+              {/* Lawyer Panel Routes (Protected) */}
+              <Route path="/lawyer-dashboard" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/lawyer-appointments" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerAppointments />
+                </ProtectedRoute>
+              } />
+              <Route path="/lawyer-all-appointments" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerAllAppointments />
+                </ProtectedRoute>
+              } />
+              <Route path="/lawyer-clients" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerClients />
+                </ProtectedRoute>
+              } />
+              <Route path="/lawyer-messages" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerMessages />
+                </ProtectedRoute>
+              } />
+              <Route path="/lawyer-video-calls" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerVideoCalls />
+                </ProtectedRoute>
+              } />
+              <Route path="/lawyer-documents" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerDocuments />
+                </ProtectedRoute>
+              } />
+              <Route path="/lawyer-profile" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerProfile />
+                </ProtectedRoute>
+              } />
+              <Route path="/lawyer-payments" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerPayments />
+                </ProtectedRoute>
+              } />
+              <Route path="/lawyer-reviews" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerReviews />
+                </ProtectedRoute>
+              } />
+              <Route path="/lawyer-settings" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <LawyerSettings />
+                </ProtectedRoute>
+              } />
               
-              {/* Admin Panel Route (No Navbar/Footer) */}
-              <Route path="/admin-dashboard" element={<AdminDashboard />} />
+              {/* Admin Panel Route (Protected) */}
+              <Route path="/admin-dashboard" element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
               
               {/* 404 Route */}
               <Route path="*" element={

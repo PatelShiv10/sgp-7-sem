@@ -83,6 +83,7 @@ exports.signupLawyer = async (req, res) => {
       bio,
       agree: true,
       isVerified: false,
+      status: 'pending', // Set initial status as pending
       otp,
       otpExpires
     });
@@ -124,14 +125,44 @@ exports.verifyOtp = async (req, res) => {
 };
 
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, role } = req.body;
+  
+  if (!email || !password || !role) {
+    return res.status(400).json({ message: 'Email, password, and role are required' });
+  }
+  
   const user = await User.findOne({ email });
-  if (!user) return res.status(400).json({ errors: ['Invalid email or password'] });
-  if (!user.isVerified) return res.status(403).json({ errors: ['Please verify your email before logging in'] });
+  if (!user) {
+    return res.status(400).json({ message: 'Invalid email or password' });
+  }
+  
+  if (!user.isVerified) {
+    return res.status(403).json({ message: 'Please verify your email before logging in' });
+  }
+  
+  // Check if user is trying to login with the correct role
+  if (user.role !== role) {
+    return res.status(403).json({ message: `Invalid login attempt. Please login as ${user.role}` });
+  }
+  
   const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) return res.status(400).json({ errors: ['Invalid email or password'] });
+  if (!isMatch) {
+    return res.status(400).json({ message: 'Invalid email or password' });
+  }
+  
   const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-  res.json({ token, user: { id: user._id, email: user.email, role: user.role, firstName: user.firstName, lastName: user.lastName } });
+  
+  res.json({ 
+    message: 'Login successful',
+    token, 
+    user: { 
+      id: user._id, 
+      email: user.email, 
+      role: user.role, 
+      firstName: user.firstName, 
+      lastName: user.lastName 
+    } 
+  });
 };
 
 exports.loginWithOtp = async (req, res) => {

@@ -4,8 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const LawyerTopBar = () => {
+  const { user, logout } = useAuth();
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,11 +53,23 @@ export const LawyerTopBar = () => {
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
+  const handleLogout = () => {
+    logout();
+  };
+
+  // Get lawyer's initials for avatar
+  const getInitials = () => {
+    if (!user) return 'L';
+    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
+  };
+
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h2 className="text-lg font-semibold text-navy">Welcome back, Dr. Smith</h2>
+          <h2 className="text-lg font-semibold text-navy">
+            Welcome back, {user ? `${user.firstName} ${user.lastName}` : 'Lawyer'}
+          </h2>
         </div>
         
         <div className="flex items-center space-x-4">
@@ -118,12 +132,14 @@ export const LawyerTopBar = () => {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span className="text-white text-sm font-bold">DS</span>
+                    <span className="text-white text-sm font-bold">{getInitials()}</span>
                   )}
                 </div>
                 <div className="hidden md:block">
-                  <p className="text-sm font-medium text-navy">Dr. Sarah Smith</p>
-                  <p className="text-xs text-gray-600">Family Law</p>
+                  <p className="text-sm font-medium text-navy">
+                    {user ? `${user.firstName} ${user.lastName}` : 'Lawyer'}
+                  </p>
+                  <p className="text-xs text-gray-600">Legal Professional</p>
                 </div>
                 <ChevronDown className="h-4 w-4 text-gray-500" />
               </div>
@@ -145,7 +161,10 @@ export const LawyerTopBar = () => {
                   <span>Settings</span>
                 </Link>
                 <hr className="my-2" />
-                <button className="flex items-center space-x-3 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors">
+                <button 
+                  onClick={handleLogout}
+                  className="flex items-center space-x-3 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                >
                   <LogOut className="h-4 w-4" />
                   <span>Logout</span>
                 </button>

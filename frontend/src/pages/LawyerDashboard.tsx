@@ -7,9 +7,11 @@ import { Calendar, Users, MessageCircle, DollarSign, Bell, FileText, Video, Sett
 import { LawyerSidebar } from '@/components/lawyer/LawyerSidebar';
 import { LawyerTopBar } from '@/components/lawyer/LawyerTopBar';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 const LawyerDashboard = () => {
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const { user } = useAuth();
 
   const dashboardStats = [
     {
@@ -64,7 +66,14 @@ const LawyerDashboard = () => {
         
         <main className="flex-1 p-6">
           <div className="max-w-7xl mx-auto">
-            <h1 className="text-3xl font-bold text-navy mb-8">Dashboard</h1>
+            <h1 className="text-3xl font-bold text-navy mb-8">
+              Dashboard
+              {user && (
+                <span className="text-lg font-normal text-gray-600 ml-2">
+                  - Welcome, {user.firstName} {user.lastName}
+                </span>
+              )}
+            </h1>
             
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

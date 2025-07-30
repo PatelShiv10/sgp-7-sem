@@ -8,33 +8,82 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState('user');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Simple mock authentication - in real app, this would validate against backend
-    const userData = {
-      firstName: 'John',
-      lastName: 'Doe',
-      email: email,
-      userType: userType as 'user' | 'lawyer'
-    };
-    
-    login(userData);
-    
-    // Redirect based on user type
-    if (userType === 'lawyer') {
-      navigate('/lawyer-dashboard');
-    } else {
-      navigate('/');
+    setIsLoading(true);
+
+    try {
+      // Make API call to backend for authentication
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          role: userType
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Store token in localStorage
+        localStorage.setItem('token', data.token);
+        
+        // Create user data object
+        const userData = {
+          firstName: data.user.firstName,
+          lastName: data.user.lastName,
+          email: data.user.email,
+          userType: data.user.role as 'user' | 'lawyer' | 'admin',
+          id: data.user.id
+        };
+        
+        login(userData);
+        
+        toast({
+          title: "Login successful!",
+          description: `Welcome back, ${userData.firstName}!`,
+        });
+        
+        // Redirect based on user type
+        if (userType === 'lawyer') {
+          navigate('/lawyer-dashboard');
+        } else if (userType === 'admin') {
+          navigate('/admin-dashboard');
+        } else {
+          navigate('/');
+        }
+      } else {
+        toast({
+          title: "Login failed",
+          description: data.message || "Invalid credentials. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Login failed",
+        description: "Network error. Please check your connection and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -49,9 +98,10 @@ const Login = () => {
         <Card className="shadow-soft border-0">
           <CardHeader>
             <Tabs value={userType} onValueChange={setUserType} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="user">User</TabsTrigger>
                 <TabsTrigger value="lawyer">Lawyer</TabsTrigger>
+                <TabsTrigger value="admin">Admin</TabsTrigger>
               </TabsList>
             </Tabs>
           </CardHeader>
@@ -71,6 +121,7 @@ const Login = () => {
                     className="pl-10"
                     placeholder="Enter your email"
                     required
+                    disabled={isLoading}
                   />
                   <Mail className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" />
                 </div>
@@ -89,12 +140,14 @@ const Login = () => {
                     className="pl-10 pr-10"
                     placeholder="Enter your password"
                     required
+                    disabled={isLoading}
                   />
                   <Lock className="h-5 w-5 text-gray-400 absolute left-3 top-2.5" />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    disabled={isLoading}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -108,6 +161,7 @@ const Login = () => {
                     name="remember-me"
                     type="checkbox"
                     className="h-4 w-4 text-teal focus:ring-teal border-gray-300 rounded"
+                    disabled={isLoading}
                   />
                   <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
                     Remember me
@@ -124,8 +178,9 @@ const Login = () => {
               <Button
                 type="submit"
                 className="w-full bg-teal hover:bg-teal-light text-white"
+                disabled={isLoading}
               >
-                Sign In as {userType === 'user' ? 'User' : 'Lawyer'}
+                {isLoading ? 'Signing in...' : `Sign In as ${userType === 'user' ? 'User' : userType === 'lawyer' ? 'Lawyer' : 'Admin'}`}
               </Button>
             </form>
 
@@ -144,6 +199,7 @@ const Login = () => {
                   asChild
                   variant="outline"
                   className="w-full border-teal text-teal hover:bg-teal hover:text-white"
+                  disabled={isLoading}
                 >
                   <Link to="/signup">
                     Create Account

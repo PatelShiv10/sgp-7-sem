@@ -10,18 +10,18 @@ import { FeedbackManagement } from '@/components/admin/FeedbackManagement';
 import { LawyerDirectoryManagement } from '@/components/admin/LawyerDirectoryManagement';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useLawyers } from '@/hooks/useLawyers';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('feedback');
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { stats: lawyerStats } = useLawyers('admin');
 
-  // Mock statistics data
-  const stats = {
+  // Mock statistics data for feedback (you can create similar hooks for feedback)
+  const feedbackStats = {
     totalFeedback: 156,
     pendingFeedback: 23,
-    totalLawyers: 45,
-    pendingLawyers: 8,
     activeUsers: 1247,
     monthlyGrowth: 12.5
   };
@@ -67,16 +67,16 @@ const AdminDashboard = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Feedback</CardTitle>
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalFeedback}</div>
+              <div className="text-2xl font-bold">{feedbackStats.totalFeedback}</div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-orange-600">{stats.pendingFeedback} pending</span>
+                <span className="text-orange-600">{feedbackStats.pendingFeedback} pending</span>
               </p>
             </CardContent>
           </Card>
@@ -87,9 +87,22 @@ const AdminDashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.totalLawyers}</div>
+              <div className="text-2xl font-bold">{lawyerStats?.totalLawyers || 0}</div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-blue-600">{stats.pendingLawyers} pending approval</span>
+                <span className="text-blue-600">{lawyerStats?.pendingLawyers || 0} pending approval</span>
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Approved Lawyers</CardTitle>
+              <Users className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{lawyerStats?.approvedLawyers || 0}</div>
+              <p className="text-xs text-muted-foreground">
+                <span className="text-green-600">Active on platform</span>
               </p>
             </CardContent>
           </Card>
@@ -100,9 +113,9 @@ const AdminDashboard = () => {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.activeUsers}</div>
+              <div className="text-2xl font-bold">{feedbackStats.activeUsers}</div>
               <p className="text-xs text-muted-foreground">
-                <span className="text-green-600">+{stats.monthlyGrowth}%</span> from last month
+                <span className="text-green-600">+{feedbackStats.monthlyGrowth}%</span> from last month
               </p>
             </CardContent>
           </Card>

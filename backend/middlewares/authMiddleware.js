@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 exports.protect = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -12,5 +13,17 @@ exports.protect = (req, res, next) => {
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Not authorized, token failed' });
+  }
+};
+
+exports.admin = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Admin role required.' });
+    }
+    next();
+  } catch (error) {
+    return res.status(500).json({ message: 'Server error' });
   }
 }; 
