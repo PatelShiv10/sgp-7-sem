@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,11 +9,27 @@ import { User, Mail, Phone, MapPin, Award, Calendar, Camera } from 'lucide-react
 import { LawyerSidebar } from '@/components/lawyer/LawyerSidebar';
 import { LawyerTopBar } from '@/components/lawyer/LawyerTopBar';
 import AvailabilityManager from '@/components/lawyer/AvailabilityManager';
+import { useToast } from '@/hooks/use-toast';
 
 const LawyerProfile = () => {
   const [currentPage, setCurrentPage] = useState('profile');
   const [profileImage, setProfileImage] = useState<string | null>(() => {
     return localStorage.getItem('lawyerProfileImage');
+  });
+  const { toast } = useToast();
+
+  const [loading, setLoading] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    specialization: '',
+    experience: '',
+    location: '',
+    barNumber: '',
+    bio: ''
   });
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -26,6 +42,90 @@ const LawyerProfile = () => {
         localStorage.setItem('lawyerProfileImage', imageUrl);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        const res = await fetch('http://localhost:5000/api/lawyers/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (!res.ok) {
+          throw new Error('Failed to load profile');
+        }
+        const data = await res.json();
+        const u = data.data;
+        setForm({
+          firstName: u.firstName || '',
+          lastName: u.lastName || '',
+          email: u.email || '',
+          phone: u.phone || '',
+          specialization: u.specialization || '',
+          experience: u.experience?.toString?.() || '',
+          location: u.location || '',
+          barNumber: u.barNumber || '',
+          bio: u.bio || ''
+        });
+      } catch (err) {
+        toast({ title: 'Error', description: 'Could not load profile', variant: 'destructive' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [toast]);
+
+  const handleChange = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setForm(prev => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const token = localStorage.getItem('token');
+      const payload = {
+        ...form,
+        experience: form.experience ? Number(form.experience) : undefined
+      };
+      const res = await fetch('http://localhost:5000/api/lawyers/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        throw new Error('Failed to save changes');
+      }
+      const data = await res.json();
+
+      // Optionally update basic auth user cache for UI consistency
+      try {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          const current = JSON.parse(stored);
+          const updated = {
+            ...current,
+            firstName: data.data.firstName,
+            lastName: data.data.lastName,
+            email: data.data.email
+          };
+          localStorage.setItem('currentUser', JSON.stringify(updated));
+        }
+      } catch {}
+
+      toast({ title: 'Saved', description: 'Profile updated successfully' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Could not save changes', variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -60,7 +160,9 @@ const LawyerProfile = () => {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <span className="text-white text-2xl font-bold">DS</span>
+                            <span className="text-white text-2xl font-bold">
+                              {form.firstName?.[0]?.toUpperCase?.()}{form.lastName?.[0]?.toUpperCase?.()}
+                            </span>
                           )}
                         </div>
                         <label className="absolute -bottom-1 -right-1 w-8 h-8 bg-white rounded-full shadow-lg border border-gray-200 flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors">
@@ -73,21 +175,21 @@ const LawyerProfile = () => {
                           />
                         </label>
                       </div>
-                      <h2 className="text-xl font-semibold text-navy mb-2">Dr. Sarah Smith</h2>
-                      <p className="text-gray-600 mb-4">Family Law Specialist</p>
+                      <h2 className="text-xl font-semibold text-navy mb-2">{form.firstName} {form.lastName}</h2>
+                      <p className="text-gray-600 mb-4">{form.specialization || 'Specialization not set'}</p>
                       <Badge className="mb-4">Verified Lawyer</Badge>
                       <div className="space-y-2 text-sm text-gray-600">
                         <div className="flex items-center justify-center space-x-2">
                           <Mail className="h-4 w-4" />
-                          <span>sarah.smith@law.com</span>
+                          <span>{form.email}</span>
                         </div>
                         <div className="flex items-center justify-center space-x-2">
                           <Phone className="h-4 w-4" />
-                          <span>+1 234-567-8900</span>
+                          <span>{form.phone || 'N/A'}</span>
                         </div>
                         <div className="flex items-center justify-center space-x-2">
                           <MapPin className="h-4 w-4" />
-                          <span>New York, NY</span>
+                          <span>{form.location || 'Location not set'}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -104,13 +206,13 @@ const LawyerProfile = () => {
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             First Name
                           </label>
-                          <Input defaultValue="Sarah" />
+                          <Input value={form.firstName} onChange={handleChange('firstName')} disabled={loading} />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
                             Last Name
                           </label>
-                          <Input defaultValue="Smith" />
+                          <Input value={form.lastName} onChange={handleChange('lastName')} disabled={loading} />
                         </div>
                       </div>
 
@@ -118,28 +220,42 @@ const LawyerProfile = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Email
                         </label>
-                        <Input type="email" defaultValue="sarah.smith@law.com" />
+                        <Input type="email" value={form.email} onChange={handleChange('email')} disabled={loading} />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Phone
                         </label>
-                        <Input defaultValue="+1 234-567-8900" />
+                        <Input value={form.phone} onChange={handleChange('phone')} disabled={loading} />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Specialization
                         </label>
-                        <Input defaultValue="Family Law" />
+                        <Input value={form.specialization} onChange={handleChange('specialization')} disabled={loading} />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Years of Experience
                         </label>
-                        <Input defaultValue="15" />
+                        <Input value={form.experience} onChange={handleChange('experience')} disabled={loading} />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Location
+                        </label>
+                        <Input value={form.location} onChange={handleChange('location')} disabled={loading} />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Bar Number
+                        </label>
+                        <Input value={form.barNumber} onChange={handleChange('barNumber')} disabled={loading} />
                       </div>
 
                       <div>
@@ -147,13 +263,15 @@ const LawyerProfile = () => {
                           Bio
                         </label>
                         <Textarea 
-                          defaultValue="Experienced family law attorney with over 15 years of practice..."
+                          value={form.bio}
+                          onChange={handleChange('bio')}
                           rows={4}
+                          disabled={loading}
                         />
                       </div>
 
-                      <Button className="w-full bg-teal hover:bg-teal-light text-white">
-                        Save Changes
+                      <Button onClick={handleSave} disabled={saving} className="w-full bg-teal hover:bg-teal-light text-white">
+                        {saving ? 'Saving...' : 'Save Changes'}
                       </Button>
                     </CardContent>
                   </Card>
