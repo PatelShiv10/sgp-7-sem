@@ -137,4 +137,68 @@ exports.getLawyerStats = async (req, res) => {
       message: 'Failed to fetch lawyer statistics'
     });
   }
+};
+
+// Fetch the current logged-in lawyer's profile
+exports.getMyProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId).select('-password -otp -otpExpires');
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.role !== 'lawyer') {
+      return res.status(403).json({ success: false, message: 'Access denied. Lawyer role required.' });
+    }
+
+    res.json({ success: true, data: user });
+  } catch (error) {
+    console.error('Error fetching my profile:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch profile' });
+  }
+};
+
+// Update the current logged-in lawyer's profile
+exports.updateMyProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const allowedFields = [
+      'firstName',
+      'lastName',
+      'email',
+      'phone',
+      'specialization',
+      'experience',
+      'location',
+      'barNumber',
+      'bio'
+    ];
+
+    const updates = {};
+    for (const field of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(userId, updates, {
+      new: true,
+      runValidators: true,
+    }).select('-password -otp -otpExpires');
+
+    if (!updatedUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (updatedUser.role !== 'lawyer') {
+      return res.status(403).json({ success: false, message: 'Access denied. Lawyer role required.' });
+    }
+
+    res.json({ success: true, message: 'Profile updated successfully', data: updatedUser });
+  } catch (error) {
+    console.error('Error updating my profile:', error);
+    res.status(500).json({ success: false, message: 'Failed to update profile' });
+  }
 }; 
