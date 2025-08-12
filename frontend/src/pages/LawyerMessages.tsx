@@ -28,11 +28,26 @@ const LawyerMessages = () => {
   const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(scrollToBottom, [messages]);
 
-  // Placeholder conversation list loader (server would provide a list of users who messaged the lawyer)
   useEffect(() => {
-    // For MVP, build from last messages across known users is out-of-scope. Keep simple: empty until user selects via client list.
-    setConversations([]);
-  }, []);
+    const loadConversations = async () => {
+      if (!lawyerId) return;
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('http://localhost:5000/api/chat/conversations', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load conversations');
+        const data = await res.json();
+        setConversations(data.data);
+        if (!selectedUserId && data.data.length > 0) {
+          setSelectedUserId(data.data[0].userId);
+        }
+      } catch (e) {
+        // keep empty list
+      }
+    };
+    loadConversations();
+  }, [lawyerId]);
 
   useEffect(() => {
     const loadConversation = async () => {
@@ -48,6 +63,16 @@ const LawyerMessages = () => {
         if (!res.ok) throw new Error('Failed to fetch conversation');
         const data = await res.json();
         setMessages(data.data);
+        // Refresh conversation list to update unread counts
+        try {
+          const listRes = await fetch('http://localhost:5000/api/chat/conversations', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (listRes.ok) {
+            const listData = await listRes.json();
+            setConversations(listData.data);
+          }
+        } catch {}
       } catch (e) {
         setError('Failed to load conversation');
       } finally {
@@ -115,7 +140,7 @@ const LawyerMessages = () => {
                         <div className="flex items-center justify-between mb-1">
                           <h3 className="font-medium text-navy">{client.name}</h3>
                           <div className="flex items-center space-x-2">
-                            <span className="text-xs text-gray-500">{client.lastTime}</span>
+                            <span className="text-xs text-gray-500">{client.lastTime ? new Date(client.lastTime).toLocaleString() : ''}</span>
                             {client.unread > 0 && (
                               <Badge className="bg-red-500 text-white text-xs">{client.unread}</Badge>
                             )}
