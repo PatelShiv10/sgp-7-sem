@@ -10,7 +10,8 @@ const {
   updateMyProfile,
   updateMyAvailability,
   getMyAvailability,
-  getPublicLawyerProfile
+  getPublicLawyerProfile,
+  getMyNotifications
 } = require('../controllers/lawyerController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
