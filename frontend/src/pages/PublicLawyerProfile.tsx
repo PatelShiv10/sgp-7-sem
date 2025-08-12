@@ -75,8 +75,12 @@ const PublicLawyerProfile = () => {
         <Card className="mb-8 shadow-soft border-0">
           <CardContent className="p-8">
             <div className="flex flex-col md:flex-row items-start space-y-6 md:space-y-0 md:space-x-8">
-              <div className="w-32 h-32 rounded-lg bg-teal text-white flex items-center justify-center text-3xl font-bold">
-                {lawyer.firstName?.[0]}{lawyer.lastName?.[0]}
+              <div className="w-32 h-32 rounded-lg bg-teal text-white flex items-center justify-center text-3xl font-bold overflow-hidden">
+                {lawyer['profileImage'] ? (
+                  <img src={(lawyer as any)['profileImage']} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span>{lawyer.firstName?.[0]}{lawyer.lastName?.[0]}</span>
+                )}
               </div>
               <div className="flex-1">
                 <div className="flex items-start justify-between mb-4">

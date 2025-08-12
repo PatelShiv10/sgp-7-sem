@@ -13,7 +13,6 @@ exports.getConversation = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lawyer not found' });
     }
 
-    // Authorization: user can only read their conversation; lawyer can read their own conversations
     const reqUser = req.user; // may be undefined if public; require auth for privacy
     if (!reqUser) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -47,19 +46,25 @@ exports.sendMessage = async (req, res) => {
     const reqUser = req.user;
     if (!reqUser) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-    // Validate the participants
     const lawyer = await User.findById(lawyerId).select('role');
     if (!lawyer || lawyer.role !== 'lawyer') {
       return res.status(404).json({ success: false, message: 'Lawyer not found' });
     }
 
-    // Determine sender role
     let sender;
     if (reqUser.role === 'lawyer' && reqUser.id === lawyerId) sender = 'lawyer';
     else if (reqUser.role === 'user' && reqUser.id === userId) sender = 'user';
     else return res.status(403).json({ success: false, message: 'Forbidden' });
 
     const msg = await Message.create({ lawyerId, userId, sender, text });
+
+    // Simple notification: when a user sends a message, mark a new notification for the lawyer (in-memory via User doc field optional)
+    try {
+      if (sender === 'user') {
+        await User.findByIdAndUpdate(lawyerId, { $set: { __hasNewMessages: true } });
+      }
+    } catch {}
+
     res.status(201).json({ success: true, data: msg });
   } catch (error) {
     console.error('Error sending message:', error);

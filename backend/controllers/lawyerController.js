@@ -139,6 +139,19 @@ exports.getLawyerStats = async (req, res) => {
   }
 };
 
+exports.getMyNotifications = async (req, res) => {
+  try {
+    const me = await User.findById(req.user.id).select('__hasNewMessages role');
+    if (!me || me.role !== 'lawyer') return res.status(403).json({ success: false, message: 'Forbidden' });
+    const hasNew = Boolean(me.__hasNewMessages);
+    // Clear flag on read
+    await User.findByIdAndUpdate(req.user.id, { $unset: { __hasNewMessages: 1 } });
+    res.json({ success: true, data: { hasNewMessages: hasNew } });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Failed to fetch notifications' });
+  }
+};
+
 // Fetch the current logged-in lawyer's profile
 exports.getMyProfile = async (req, res) => {
   try {
@@ -175,7 +188,8 @@ exports.updateMyProfile = async (req, res) => {
       'barNumber',
       'bio',
       'education',
-      'certifications'
+      'certifications',
+      'profileImage'
     ];
 
     const updates = {};

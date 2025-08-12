@@ -27,6 +27,7 @@ const userSchema = new mongoose.Schema({
   education: { type: [String], default: [] },
   certifications: { type: [String], default: [] },
   availability: { type: [dayScheduleSchema], default: [] },
+  profileImage: { type: String },
   agree: { type: Boolean, required: true },
   isVerified: { type: Boolean, default: false },
   status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
