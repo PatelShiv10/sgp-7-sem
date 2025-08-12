@@ -1,10 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
-import { ArrowLeft, Clock, CreditCard, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Clock, CreditCard, CheckCircle, Loader2 } from 'lucide-react';
+
+interface PublicLawyer {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  specialization?: string;
+  availability?: { day: string; isActive: boolean; timeSlots: { startTime: string; endTime: string; isActive: boolean }[] }[];
+}
 
 const AppointmentBooking = () => {
   const { lawyerId } = useParams();
@@ -13,46 +21,48 @@ const AppointmentBooking = () => {
   const [caseDescription, setCaseDescription] = useState('');
   const [isBooked, setIsBooked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingLawyer, setLoadingLawyer] = useState(true);
+  const [lawyer, setLawyer] = useState<PublicLawyer | null>(null);
 
-  const lawyer = {
-    name: 'Sarah Johnson',
-    specialization: 'Corporate Law',
-    hourlyRate: 350,
-    avatar: 'SJ'
-  };
-
-  // Mock lawyer's available time slots based on their schedule
-  const getAvailableTimeSlots = (date: Date) => {
-    const dayOfWeek = date.getDay();
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDay = dayNames[dayOfWeek];
-
-    // Mock schedule data (in real app, this would come from backend)
-    const lawyerSchedule = {
-      'Monday': ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'],
-      'Tuesday': ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'],
-      'Wednesday': ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'],
-      'Thursday': ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM', '04:00 PM'],
-      'Friday': ['09:00 AM', '10:00 AM', '11:00 AM', '02:00 PM', '03:00 PM'],
-      'Saturday': [],
-      'Sunday': []
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoadingLawyer(true);
+        const res = await fetch(`http://localhost:5000/api/lawyers/${lawyerId}/public`);
+        if (!res.ok) throw new Error('Failed to load');
+        const data = await res.json();
+        setLawyer(data.data);
+      } catch (e) {
+        setLawyer(null);
+      } finally {
+        setLoadingLawyer(false);
+      }
     };
+    if (lawyerId) load();
+  }, [lawyerId]);
 
-    return lawyerSchedule[currentDay as keyof typeof lawyerSchedule] || [];
-  };
-
-  const availableTimeSlots = selectedDate ? getAvailableTimeSlots(selectedDate) : [];
+  const availableTimeSlots = useMemo(() => {
+    if (!selectedDate || !lawyer?.availability) return [] as string[];
+    const dayOfWeek = selectedDate.getDay();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = dayNames[dayOfWeek];
+    const day = lawyer.availability.find(d => d.day === dayName && d.isActive);
+    if (!day) return [];
+    const slots: string[] = [];
+    day.timeSlots.filter(s => s.isActive).forEach(s => {
+      slots.push(`${s.startTime} - ${s.endTime}`);
+    });
+    return slots;
+  }, [selectedDate, lawyer]);
 
   const handleBookAppointment = async () => {
     if (!selectedDate || !selectedTime || !caseDescription.trim()) return;
 
     setIsLoading(true);
-    
-    // Simulate booking process
     setTimeout(() => {
       setIsBooked(true);
       setIsLoading(false);
-    }, 2000);
+    }, 1200);
   };
 
   if (isBooked) {
@@ -63,7 +73,7 @@ const AppointmentBooking = () => {
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-6" />
             <h1 className="text-3xl font-bold text-navy mb-4">Appointment Confirmed!</h1>
             <p className="text-lg text-gray-600 mb-6">
-              Your consultation with {lawyer.name} has been successfully booked.
+              Your consultation with {lawyer ? `${lawyer.firstName} ${lawyer.lastName}` : 'the lawyer'} has been successfully booked.
             </p>
             <div className="bg-green-50 p-6 rounded-lg mb-8">
               <h3 className="font-semibold text-green-800 mb-3">Appointment Details:</h3>
@@ -71,7 +81,7 @@ const AppointmentBooking = () => {
                 <p><strong>Date:</strong> {selectedDate?.toLocaleDateString()}</p>
                 <p><strong>Time:</strong> {selectedTime}</p>
                 <p><strong>Duration:</strong> 1 hour</p>
-                <p><strong>Rate:</strong> ${lawyer.hourlyRate}/hour</p>
+                <p><strong>Rate:</strong> $250/hour</p>
               </div>
             </div>
             <div className="space-y-4">
@@ -83,7 +93,6 @@ const AppointmentBooking = () => {
               <div>
                 <Button asChild variant="outline">
                   <Link to="/find-lawyer">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Lawyers
                   </Link>
                 </Button>
@@ -91,6 +100,30 @@ const AppointmentBooking = () => {
             </div>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  if (loadingLawyer) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-16 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading booking...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!lawyer) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-16 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Lawyer not found</p>
+          <Button asChild>
+            <Link to="/find-lawyer">Back to list</Link>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -112,7 +145,7 @@ const AppointmentBooking = () => {
             <Card className="shadow-soft border-0">
               <CardHeader>
                 <CardTitle className="text-2xl text-navy">Book Consultation</CardTitle>
-                <p className="text-gray-600">Schedule your legal consultation with {lawyer.name}</p>
+                <p className="text-gray-600">Schedule your legal consultation with {lawyer.firstName} {lawyer.lastName}</p>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Calendar */}
@@ -122,7 +155,6 @@ const AppointmentBooking = () => {
                     mode="single"
                     selected={selectedDate}
                     onSelect={setSelectedDate}
-                    disabled={(date) => date < new Date() || date.getDay() === 0 || date.getDay() === 6}
                     className="rounded-md border"
                   />
                 </div>
@@ -136,11 +168,11 @@ const AppointmentBooking = () => {
                         {availableTimeSlots.map((time) => (
                           <Button
                             key={time}
-                            variant={selectedTime === time ? "default" : "outline"}
+                            variant={selectedTime === time ? 'default' : 'outline'}
                             onClick={() => setSelectedTime(time)}
                             className={selectedTime === time 
-                              ? "bg-teal hover:bg-teal-light text-white" 
-                              : "border-teal text-teal hover:bg-teal hover:text-white"
+                              ? 'bg-teal hover:bg-teal-light text-white' 
+                              : 'border-teal text-teal hover:bg-teal hover:text-white'
                             }
                           >
                             <Clock className="h-4 w-4 mr-2" />
@@ -181,11 +213,11 @@ const AppointmentBooking = () => {
                 {/* Lawyer Info */}
                 <div className="flex items-center space-x-3 pb-4 border-b">
                   <div className="w-12 h-12 bg-teal text-white rounded-full flex items-center justify-center font-semibold">
-                    {lawyer.avatar}
+                    {lawyer.firstName?.[0]}{lawyer.lastName?.[0]}
                   </div>
                   <div>
-                    <p className="font-semibold text-navy">{lawyer.name}</p>
-                    <p className="text-sm text-teal">{lawyer.specialization}</p>
+                    <p className="font-semibold text-navy">{lawyer.firstName} {lawyer.lastName}</p>
+                    <p className="text-sm text-teal">{lawyer.specialization || 'General Practice'}</p>
                   </div>
                 </div>
 
@@ -207,7 +239,7 @@ const AppointmentBooking = () => {
                   </div>
                   <div className="flex justify-between text-lg font-semibold border-t pt-3">
                     <span>Total:</span>
-                    <span className="text-navy">${lawyer.hourlyRate}</span>
+                    <span className="text-navy">$250</span>
                   </div>
                 </div>
 
