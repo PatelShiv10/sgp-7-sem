@@ -129,10 +129,14 @@ const FindLawyer = () => {
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 rounded-full bg-teal flex items-center justify-center">
-                      <span className="text-white font-bold text-lg">
-                        {lawyer.firstName.charAt(0)}{lawyer.lastName.charAt(0)}
-                      </span>
+                    <div className="w-12 h-12 rounded-full bg-teal flex items-center justify-center overflow-hidden">
+                      {lawyer.profileImage ? (
+                        <img src={lawyer.profileImage} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-white font-bold text-lg">
+                          {lawyer.firstName.charAt(0)}{lawyer.lastName.charAt(0)}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <CardTitle className="text-lg">{lawyer.firstName} {lawyer.lastName}</CardTitle>

@@ -81,6 +81,10 @@ const LawyerProfile = () => {
           education: Array.isArray(u.education) ? u.education : [],
           certifications: Array.isArray(u.certifications) ? u.certifications : []
         });
+        if (u.profileImage && !localStorage.getItem('lawyerProfileImage')) {
+          localStorage.setItem('lawyerProfileImage', u.profileImage);
+          setProfileImage(u.profileImage);
+        }
 
         if (resAvailability.ok) {
           const avData = await resAvailability.json();
@@ -118,7 +122,8 @@ const LawyerProfile = () => {
       const token = localStorage.getItem('token');
       const payload = {
         ...form,
-        experience: form.experience ? Number(form.experience) : undefined
+        experience: form.experience ? Number(form.experience) : undefined,
+        profileImage: profileImage || undefined
       };
       const res = await fetch('http://localhost:5000/api/lawyers/me', {
         method: 'PUT',
@@ -144,6 +149,10 @@ const LawyerProfile = () => {
             email: data.data.email
           };
           localStorage.setItem('currentUser', JSON.stringify(updated));
+        }
+        if (data.data.profileImage) {
+          localStorage.setItem('lawyerProfileImage', data.data.profileImage);
+          setProfileImage(data.data.profileImage);
         }
       } catch {}
 

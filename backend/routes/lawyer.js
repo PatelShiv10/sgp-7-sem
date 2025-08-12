@@ -21,6 +21,7 @@ router.get('/:id/public', getPublicLawyerProfile);
 // Protected routes for lawyers
 router.get('/me', protect, getMyProfile);
 router.put('/me', protect, updateMyProfile);
+router.get('/me/notifications', protect, getMyNotifications);
 router.get('/me/availability', protect, getMyAvailability);
 router.put('/me/availability', protect, updateMyAvailability);
 
