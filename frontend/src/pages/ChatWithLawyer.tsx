@@ -1,65 +1,84 @@
 
-import { useState } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Send, ArrowLeft, Phone, Video } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Message {
-  id: number;
+  _id: string;
   text: string;
-  isUser: boolean;
-  timestamp: Date;
-  sender: string;
+  sender: 'user' | 'lawyer';
+  createdAt: string;
 }
 
 const ChatWithLawyer = () => {
   const { lawyerId } = useParams();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      text: "Hello! I'm Sarah Johnson. Thank you for reaching out. How can I assist you with your legal matter today?",
-      isUser: false,
-      timestamp: new Date(),
-      sender: 'Sarah Johnson'
-    }
-  ]);
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const endRef = useRef<HTMLDivElement | null>(null);
 
-  const lawyer = {
-    name: 'Sarah Johnson',
-    specialization: 'Corporate Law',
-    avatar: 'SJ',
-    status: 'online',
-    hourlyRate: 350
-  };
+  const userId = user?.id;
 
-  const handleSendMessage = () => {
-    if (!inputText.trim()) return;
+  const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  useEffect(scrollToBottom, [messages]);
 
-    const userMessage: Message = {
-      id: messages.length + 1,
-      text: inputText,
-      isUser: true,
-      timestamp: new Date(),
-      sender: 'You'
+  useEffect(() => {
+    const fetchConversation = async () => {
+      try {
+        if (!lawyerId || !userId) return;
+        setLoading(true);
+        setError(null);
+        const token = localStorage.getItem('token');
+        const params = new URLSearchParams({ lawyerId, userId });
+        const res = await fetch(`http://localhost:5000/api/chat/conversation?${params.toString()}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load messages');
+        const data = await res.json();
+        setMessages(data.data);
+      } catch (e) {
+        setError('Failed to load conversation');
+      } finally {
+        setLoading(false);
+      }
     };
+    fetchConversation();
+  }, [lawyerId, userId]);
 
-    setMessages(prev => [...prev, userMessage]);
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || !lawyerId || !userId) return;
+    const optimistic: Message = {
+      _id: 'temp-' + Date.now(),
+      text: inputText,
+      sender: 'user',
+      createdAt: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, optimistic]);
     setInputText('');
 
-    // Simulate lawyer response
-    setTimeout(() => {
-      const lawyerResponse: Message = {
-        id: messages.length + 2,
-        text: `Thank you for sharing that information. Based on what you've described, I can provide some initial guidance. However, for a comprehensive analysis of your situation, I'd recommend scheduling a formal consultation where we can discuss this in detail. Would you like me to help you understand the key aspects of your concern?`,
-        isUser: false,
-        timestamp: new Date(),
-        sender: lawyer.name
-      };
-      setMessages(prev => [...prev, lawyerResponse]);
-    }, 1500);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/chat/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ lawyerId, userId, text: optimistic.text })
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      const { data } = await res.json();
+      setMessages(prev => prev.map(m => m._id === optimistic._id ? data : m));
+    } catch (e) {
+      setMessages(prev => prev.filter(m => m._id !== optimistic._id));
+      alert('Failed to send message');
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -67,6 +86,14 @@ const ChatWithLawyer = () => {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const lawyer = {
+    name: 'Lawyer',
+    specialization: 'General Law',
+    avatar: 'L',
+    status: 'online',
+    hourlyRate: 250
   };
 
   return (
@@ -107,9 +134,7 @@ const ChatWithLawyer = () => {
               </Link>
             </Button>
             <Button asChild size="sm" className="bg-teal hover:bg-teal-light text-white">
-              <Link to={`/booking/${lawyerId}`}>
-                Book Consultation
-              </Link>
+              <Link to={`/booking/${lawyerId}`}>Book Consultation</Link>
             </Button>
           </div>
         </div>
@@ -120,27 +145,30 @@ const ChatWithLawyer = () => {
             <Card className="flex-1 shadow-soft border-0 flex flex-col">
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {loading && <div className="text-center text-gray-500">Loading...</div>}
+                {error && <div className="text-center text-red-600">{error}</div>}
                 {messages.map((message) => (
                   <div
-                    key={message.id}
-                    className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}
+                    key={message._id}
+                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div className={`max-w-[70%] ${message.isUser ? 'order-2' : 'order-1'}`}>
+                    <div className={`max-w-[70%] ${message.sender === 'user' ? 'order-2' : 'order-1'}`}>
                       <div className={`p-4 rounded-lg ${
-                        message.isUser 
+                        message.sender === 'user' 
                           ? 'bg-teal text-white' 
                           : 'bg-gray-100'
                       }`}>
                         <p className="leading-relaxed">{message.text}</p>
                       </div>
                       <div className={`text-xs text-gray-500 mt-1 ${
-                        message.isUser ? 'text-right' : 'text-left'
+                        message.sender === 'user' ? 'text-right' : 'text-left'
                       }`}>
-                        {message.sender} • {message.timestamp.toLocaleTimeString()}
+                        {new Date(message.createdAt).toLocaleTimeString()}
                       </div>
                     </div>
                   </div>
                 ))}
+                <div ref={endRef} />
               </div>
 
               {/* Input Area */}
