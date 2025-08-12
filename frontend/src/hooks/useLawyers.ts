@@ -12,6 +12,7 @@ interface Lawyer {
   location?: string;
   barNumber?: string;
   bio?: string;
+  profileImage?: string;
   isVerified: boolean;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
