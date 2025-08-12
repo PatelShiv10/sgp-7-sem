@@ -5,11 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Mail, Phone, MapPin, Award, Calendar, Camera } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Award, Calendar, Camera, Plus, Trash2, Check } from 'lucide-react';
 import { LawyerSidebar } from '@/components/lawyer/LawyerSidebar';
 import { LawyerTopBar } from '@/components/lawyer/LawyerTopBar';
 import AvailabilityManager from '@/components/lawyer/AvailabilityManager';
 import { useToast } from '@/hooks/use-toast';
+
+interface DaySchedule {
+  day: string;
+  isActive: boolean;
+  timeSlots: { startTime: string; endTime: string; isActive: boolean }[];
+}
 
 const LawyerProfile = () => {
   const [currentPage, setCurrentPage] = useState('profile');
@@ -29,8 +35,12 @@ const LawyerProfile = () => {
     experience: '',
     location: '',
     barNumber: '',
-    bio: ''
+    bio: '',
+    education: [] as string[],
+    certifications: [] as string[]
   });
+  const [availability, setAvailability] = useState<DaySchedule[]>([]);
+  const [savingAvailability, setSavingAvailability] = useState(false);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -50,15 +60,13 @@ const LawyerProfile = () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const res = await fetch('http://localhost:5000/api/lawyers/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (!res.ok) {
-          throw new Error('Failed to load profile');
-        }
-        const data = await res.json();
+        const [resProfile, resAvailability] = await Promise.all([
+          fetch('http://localhost:5000/api/lawyers/me', { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch('http://localhost:5000/api/lawyers/me/availability', { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+
+        if (!resProfile.ok) throw new Error('Failed to load profile');
+        const data = await resProfile.json();
         const u = data.data;
         setForm({
           firstName: u.firstName || '',
@@ -69,8 +77,15 @@ const LawyerProfile = () => {
           experience: u.experience?.toString?.() || '',
           location: u.location || '',
           barNumber: u.barNumber || '',
-          bio: u.bio || ''
+          bio: u.bio || '',
+          education: Array.isArray(u.education) ? u.education : [],
+          certifications: Array.isArray(u.certifications) ? u.certifications : []
         });
+
+        if (resAvailability.ok) {
+          const avData = await resAvailability.json();
+          setAvailability(avData.data || []);
+        }
       } catch (err) {
         toast({ title: 'Error', description: 'Could not load profile', variant: 'destructive' });
       } finally {
@@ -83,6 +98,18 @@ const LawyerProfile = () => {
 
   const handleChange = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm(prev => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const addToList = (field: 'education' | 'certifications') => {
+    setForm(prev => ({ ...prev, [field]: [...prev[field], ''] }));
+  };
+
+  const updateListItem = (field: 'education' | 'certifications', index: number, value: string) => {
+    setForm(prev => ({ ...prev, [field]: prev[field].map((v, i) => i === index ? value : v) }));
+  };
+
+  const removeListItem = (field: 'education' | 'certifications', index: number) => {
+    setForm(prev => ({ ...prev, [field]: prev[field].filter((_, i) => i !== index) }));
   };
 
   const handleSave = async () => {
@@ -106,7 +133,6 @@ const LawyerProfile = () => {
       }
       const data = await res.json();
 
-      // Optionally update basic auth user cache for UI consistency
       try {
         const stored = localStorage.getItem('currentUser');
         if (stored) {
@@ -129,6 +155,27 @@ const LawyerProfile = () => {
     }
   };
 
+  const handleSaveAvailability = async () => {
+    try {
+      setSavingAvailability(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/lawyers/me/availability', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ availability })
+      });
+      if (!res.ok) throw new Error('Failed to save availability');
+      toast({ title: 'Saved', description: 'Availability updated successfully' });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Could not save availability', variant: 'destructive' });
+    } finally {
+      setSavingAvailability(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <LawyerSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
@@ -141,14 +188,14 @@ const LawyerProfile = () => {
             <h1 className="text-2xl lg:text-3xl font-bold text-navy mb-6">Profile</h1>
 
             <Tabs defaultValue="profile" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="profile">Profile Information</TabsTrigger>
                 <TabsTrigger value="availability">Availability</TabsTrigger>
+                <TabsTrigger value="credentials">Education & Certifications</TabsTrigger>
               </TabsList>
 
               <TabsContent value="profile">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Profile Card */}
                   <Card className="shadow-soft border-0 lg:col-span-1">
                     <CardContent className="p-6 text-center">
                       <div className="relative w-24 h-24 mx-auto mb-4">
@@ -195,7 +242,6 @@ const LawyerProfile = () => {
                     </CardContent>
                   </Card>
 
-                  {/* Profile Form */}
                   <Card className="shadow-soft border-0 lg:col-span-2">
                     <CardHeader>
                       <CardTitle>Edit Profile</CardTitle>
@@ -279,7 +325,61 @@ const LawyerProfile = () => {
               </TabsContent>
 
               <TabsContent value="availability">
-                <AvailabilityManager />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-navy">Availability Settings</h2>
+                    <Button onClick={handleSaveAvailability} disabled={savingAvailability} className="bg-teal hover:bg-teal-light text-white">
+                      {savingAvailability ? 'Saving...' : 'Save Schedule'}
+                    </Button>
+                  </div>
+                  <AvailabilityManager value={availability} onChange={setAvailability} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="credentials">
+                <Card className="shadow-soft border-0">
+                  <CardHeader>
+                    <CardTitle>Education</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {form.education.map((item, index) => (
+                      <div key={`edu-${index}`} className="flex items-center space-x-2">
+                        <Input value={item} onChange={(e) => updateListItem('education', index, e.target.value)} />
+                        <Button variant="outline" onClick={() => removeListItem('education', index)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" onClick={() => addToList('education')} className="border-dashed">
+                      <Plus className="h-4 w-4 mr-2" /> Add Education
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-soft border-0 mt-6">
+                  <CardHeader>
+                    <CardTitle>Certifications</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {form.certifications.map((item, index) => (
+                      <div key={`cert-${index}`} className="flex items-center space-x-2">
+                        <Input value={item} onChange={(e) => updateListItem('certifications', index, e.target.value)} />
+                        <Button variant="outline" onClick={() => removeListItem('certifications', index)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button variant="outline" onClick={() => addToList('certifications')} className="border-dashed">
+                      <Plus className="h-4 w-4 mr-2" /> Add Certification
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <div className="mt-6">
+                  <Button onClick={handleSave} disabled={saving} className="w-full bg-teal hover:bg-teal-light text-white">
+                    {saving ? 'Saving...' : 'Save Credentials'}
+                  </Button>
+                </div>
               </TabsContent>
             </Tabs>
           </div>

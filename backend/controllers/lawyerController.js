@@ -173,7 +173,9 @@ exports.updateMyProfile = async (req, res) => {
       'experience',
       'location',
       'barNumber',
-      'bio'
+      'bio',
+      'education',
+      'certifications'
     ];
 
     const updates = {};
@@ -200,5 +202,62 @@ exports.updateMyProfile = async (req, res) => {
   } catch (error) {
     console.error('Error updating my profile:', error);
     res.status(500).json({ success: false, message: 'Failed to update profile' });
+  }
+};
+
+// Set or update current lawyer availability
+exports.updateMyAvailability = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { availability } = req.body; // array of day schedules
+
+    if (!Array.isArray(availability)) {
+      return res.status(400).json({ success: false, message: 'Invalid availability format' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (user.role !== 'lawyer') return res.status(403).json({ success: false, message: 'Access denied. Lawyer role required.' });
+
+    user.availability = availability;
+    await user.save();
+
+    res.json({ success: true, message: 'Availability updated successfully', data: user.availability });
+  } catch (error) {
+    console.error('Error updating availability:', error);
+    res.status(500).json({ success: false, message: 'Failed to update availability' });
+  }
+};
+
+// Get current lawyer availability
+exports.getMyAvailability = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId).select('availability role');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (user.role !== 'lawyer') return res.status(403).json({ success: false, message: 'Access denied. Lawyer role required.' });
+    res.json({ success: true, data: user.availability || [] });
+  } catch (error) {
+    console.error('Error fetching availability:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch availability' });
+  }
+};
+
+// Public: Get lawyer profile by ID (for public view and booking)
+exports.getPublicLawyerProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id)
+      .select('-password -otp -otpExpires -phone')
+      .lean();
+
+    if (!user || user.role !== 'lawyer' || !user.isVerified) {
+      return res.status(404).json({ success: false, message: 'Lawyer not found' });
+    }
+
+    res.json({ success: true, data: user });
+  } catch (error) {
+    console.error('Error fetching public lawyer profile:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch lawyer profile' });
   }
 }; 

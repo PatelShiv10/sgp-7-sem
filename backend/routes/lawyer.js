@@ -7,16 +7,22 @@ const {
   deleteLawyer, 
   getLawyerStats,
   getMyProfile,
-  updateMyProfile 
+  updateMyProfile,
+  updateMyAvailability,
+  getMyAvailability,
+  getPublicLawyerProfile
 } = require('../controllers/lawyerController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
 // Public routes
 router.get('/approved', getApprovedLawyers);
+router.get('/:id/public', getPublicLawyerProfile);
 
 // Protected routes for lawyers
 router.get('/me', protect, getMyProfile);
 router.put('/me', protect, updateMyProfile);
+router.get('/me/availability', protect, getMyAvailability);
+router.put('/me/availability', protect, updateMyAvailability);
 
 // Protected routes (admin only)
 router.get('/all', protect, admin, getAllLawyers);
