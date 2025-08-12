@@ -11,8 +11,16 @@ interface PublicLawyer {
   firstName: string;
   lastName: string;
   specialization?: string;
-  availability?: { day: string; isActive: boolean; timeSlots: { startTime: string; endTime: string; isActive: boolean }[] }[];
 }
+
+interface SlotsByDate { date: string; slots: string[] }
+
+const fmtDate = (d: Date) => {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
 
 const AppointmentBooking = () => {
   const { lawyerId } = useParams();
@@ -23,9 +31,13 @@ const AppointmentBooking = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingLawyer, setLoadingLawyer] = useState(true);
   const [lawyer, setLawyer] = useState<PublicLawyer | null>(null);
+  const [month, setMonth] = useState<Date>(new Date());
+  const [slots, setSlots] = useState<SlotsByDate[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
+    const loadLawyer = async () => {
       try {
         setLoadingLawyer(true);
         const res = await fetch(`http://localhost:5000/api/lawyers/${lawyerId}/public`);
@@ -38,31 +50,74 @@ const AppointmentBooking = () => {
         setLoadingLawyer(false);
       }
     };
-    if (lawyerId) load();
+    if (lawyerId) loadLawyer();
   }, [lawyerId]);
 
+  const loadSlots = useMemo(() => async () => {
+    try {
+      setLoadingSlots(true);
+      setError(null);
+      const start = new Date(month.getFullYear(), month.getMonth(), 1);
+      const end = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+      const qs = `start=${fmtDate(start)}&end=${fmtDate(end)}`;
+      const res = await fetch(`http://localhost:5000/api/bookings/lawyers/${lawyerId}/slots?${qs}`);
+      if (!res.ok) throw new Error('Failed to load slots');
+      const data = await res.json();
+      setSlots(data.data);
+    } catch (e) {
+      setSlots([]);
+      setError('Failed to load availability');
+    } finally {
+      setLoadingSlots(false);
+    }
+  }, [lawyerId, month]);
+
+  useEffect(() => {
+    if (lawyerId) {
+      loadSlots();
+    }
+  }, [loadSlots, lawyerId]);
+
   const availableTimeSlots = useMemo(() => {
-    if (!selectedDate || !lawyer?.availability) return [] as string[];
-    const dayOfWeek = selectedDate.getDay();
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const dayName = dayNames[dayOfWeek];
-    const day = lawyer.availability.find(d => d.day === dayName && d.isActive);
-    if (!day) return [];
-    const slots: string[] = [];
-    day.timeSlots.filter(s => s.isActive).forEach(s => {
-      slots.push(`${s.startTime} - ${s.endTime}`);
-    });
-    return slots;
-  }, [selectedDate, lawyer]);
+    if (!selectedDate) return [] as string[];
+    const entry = slots.find(s => s.date === fmtDate(selectedDate));
+    return entry ? entry.slots.map(s => `${s}`) : [];
+  }, [selectedDate, slots]);
+
+  const disabled = useMemo(() => {
+    const activeDates = new Set(slots.filter(s => s.slots.length > 0).map(s => s.date));
+    return (date: Date) => !activeDates.has(fmtDate(date));
+  }, [slots]);
 
   const handleBookAppointment = async () => {
-    if (!selectedDate || !selectedTime || !caseDescription.trim()) return;
+    if (!selectedDate || !selectedTime || !caseDescription.trim() || !lawyerId) return;
 
-    setIsLoading(true);
-    setTimeout(() => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          lawyerId,
+          date: fmtDate(selectedDate),
+          start: selectedTime.split(' ')[0],
+          durationMins: 30
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Booking failed');
+      }
       setIsBooked(true);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
       setIsLoading(false);
-    }, 1200);
+    }
   };
 
   if (isBooked) {
@@ -92,9 +147,7 @@ const AppointmentBooking = () => {
               </Button>
               <div>
                 <Button asChild variant="outline">
-                  <Link to="/find-lawyer">
-                    Back to Lawyers
-                  </Link>
+                  <Link to="/find-lawyer">Back to Lawyers</Link>
                 </Button>
               </div>
             </div>
@@ -154,9 +207,18 @@ const AppointmentBooking = () => {
                   <Calendar
                     mode="single"
                     selected={selectedDate}
-                    onSelect={setSelectedDate}
+                    onSelect={(d) => { setSelectedDate(d); setSelectedTime(''); }}
+                    month={month}
+                    onMonthChange={setMonth}
+                    disabled={disabled}
                     className="rounded-md border"
                   />
+                  {loadingSlots && (
+                    <div className="text-sm text-gray-500 mt-2">Loading availability...</div>
+                  )}
+                  {error && (
+                    <div className="text-sm text-red-600 mt-2">{error}</div>
+                  )}
                 </div>
 
                 {/* Time Selection */}
