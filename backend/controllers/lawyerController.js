@@ -144,8 +144,12 @@ exports.getMyNotifications = async (req, res) => {
     const me = await User.findById(req.user.id).select('__hasNewMessages role');
     if (!me || me.role !== 'lawyer') return res.status(403).json({ success: false, message: 'Forbidden' });
     const hasNew = Boolean(me.__hasNewMessages);
-    // Clear flag on read
-    await User.findByIdAndUpdate(req.user.id, { $unset: { __hasNewMessages: 1 } });
+
+    const shouldClear = (req.query.clear ?? 'true') !== 'false';
+    if (shouldClear && hasNew) {
+      await User.findByIdAndUpdate(req.user.id, { $unset: { __hasNewMessages: 1 } });
+    }
+
     res.json({ success: true, data: { hasNewMessages: hasNew } });
   } catch (e) {
     res.status(500).json({ success: false, message: 'Failed to fetch notifications' });
