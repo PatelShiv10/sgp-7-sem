@@ -72,6 +72,29 @@ exports.updateLawyerStatus = async (req, res) => {
       });
     }
 
+    // Send email notification
+    try {
+      const { sendMail } = require('../utils/mailer');
+      const subject = status === 'approved' 
+        ? 'Your LawMate lawyer account has been approved'
+        : status === 'rejected'
+          ? 'Your LawMate lawyer account application has been rejected'
+          : 'Your LawMate lawyer account status has changed';
+      const html = `
+        <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:24px;border-radius:8px;background:#f9f9f9;border:1px solid #eee;">
+          <h2 style="color:#008080;margin:0 0 12px">LawMate Update</h2>
+          <p>Hi <b>${lawyer.firstName}</b>,</p>
+          <p>Your lawyer account status has been updated to <b>${status}</b>.</p>
+          ${status === 'approved' ? '<p>You can now be discovered in the Find a Lawyer directory and start receiving bookings.</p>' : ''}
+          ${status === 'rejected' ? '<p>If you believe this is an error, please reply to this email with additional details.</p>' : ''}
+          <p style="margin-top:24px;color:#888;">— LawMate Team</p>
+        </div>
+      `;
+      await sendMail({ to: lawyer.email, subject, html });
+    } catch (mailErr) {
+      console.warn('Failed to send status email:', mailErr);
+    }
+
     res.json({
       success: true,
       message: `Lawyer ${status} successfully`,
