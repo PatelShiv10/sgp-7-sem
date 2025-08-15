@@ -6,25 +6,39 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const LawSimplify = () => {
   const [legalText, setLegalText] = useState('');
-  const [result, setResult] = useState<{
-    explanation: string;
-    example: string;
-  } | null>(null);
+  const [result, setResult] = useState<any | null>(null);
+  const [language, setLanguage] = useState<'English'|'Hindi'|'Gujarati'>('English');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSimplify = async () => {
     if (!legalText.trim()) return;
 
     setIsLoading(true);
-    
-    // Simulate AI processing
-    setTimeout(() => {
-      setResult({
-        explanation: `This legal text essentially means: The provided clause establishes the terms and conditions for a specific legal agreement. In simpler terms, it outlines the rights, responsibilities, and obligations of all parties involved. The key points include definitions of important terms, the scope of the agreement, and the consequences of not following the stated conditions.`,
-        example: `Real-life example: Think of this like a rental agreement for an apartment. Just as a lease specifies when rent is due, who's responsible for repairs, and what happens if rules are broken, this legal clause sets similar ground rules for whatever situation it governs. For instance, if this were about a service contract, it would be like saying "We'll provide the service, you'll pay on time, and here's what happens if either of us doesn't hold up our end of the deal."`
+    try {
+      const res = await fetch('http://localhost:8000/simplify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: legalText })
       });
+      if (!res.ok) throw new Error('Failed to simplify');
+      const data = await res.json();
+      let output = data;
+      if (language !== 'English') {
+        const tRes = await fetch('http://localhost:8000/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ result: data, target_language: language })
+        });
+        if (tRes.ok) {
+          output = await tRes.json();
+        }
+      }
+      setResult(output);
+    } catch (e) {
+      alert('Failed to process. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -50,13 +64,25 @@ const LawSimplify = () => {
               placeholder="Paste any legal clause, contract terms, or legal document text here..."
               className="min-h-[200px] border-gray-300 focus:border-teal focus:ring-teal"
             />
-            <Button
-              onClick={handleSimplify}
-              disabled={!legalText.trim() || isLoading}
-              className="bg-teal hover:bg-teal-light text-white px-8"
-            >
-              {isLoading ? 'Simplifying...' : 'Simplify Legal Text'}
-            </Button>
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-gray-700">Translate to:</label>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value as any)}
+                className="px-3 py-2 border rounded-md"
+              >
+                <option>English</option>
+                <option>Hindi</option>
+                <option>Gujarati</option>
+              </select>
+              <Button
+                onClick={handleSimplify}
+                disabled={!legalText.trim() || isLoading}
+                className="bg-teal hover:bg-teal-light text-white px-8 ml-auto"
+              >
+                {isLoading ? 'Simplifying...' : 'Simplify Legal Text'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -72,7 +98,7 @@ const LawSimplify = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                <p className="text-gray-700 leading-relaxed">{result.explanation}</p>
+                <p className="text-gray-700 leading-relaxed">{result.simplified_explanation || result.explanation}</p>
               </CardContent>
             </Card>
 
@@ -85,7 +111,7 @@ const LawSimplify = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                <p className="text-gray-700 leading-relaxed">{result.example}</p>
+                <p className="text-gray-700 leading-relaxed">{result.real_life_example || result.example}</p>
               </CardContent>
             </Card>
           </div>
