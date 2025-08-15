@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Search, Filter, CheckCircle, Clock, AlertCircle, MessageSquare, TrendingUp } from 'lucide-react';
 
 interface Feedback {
-  id: string;
-  user: string;
+  _id: string;
+  userEmail: string;
+  userName?: string;
   type: 'bug' | 'suggestion' | 'general';
   subject: string;
   message: string;
@@ -26,55 +27,51 @@ export const FeedbackManagement = () => {
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
+  const [feedbackData, setFeedbackData] = useState<Feedback[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock feedback data
-  const feedbackData: Feedback[] = [
-    {
-      id: '1',
-      user: 'john.doe@email.com',
-      type: 'bug',
-      subject: 'Login issue on mobile',
-      message: 'Unable to login using mobile browser. Getting error message.',
-      status: 'pending',
-      priority: 'high',
-      createdAt: '2024-01-15T10:30:00Z',
-    },
-    {
-      id: '2',
-      user: 'jane.smith@email.com',
-      type: 'suggestion',
-      subject: 'Add dark mode feature',
-      message: 'Would love to have a dark mode option for better user experience.',
-      status: 'resolved',
-      priority: 'medium',
-      createdAt: '2024-01-14T14:20:00Z',
-      resolvedAt: '2024-01-16T09:15:00Z',
-    },
-    {
-      id: '3',
-      user: 'mike.johnson@email.com',
-      type: 'general',
-      subject: 'Great platform!',
-      message: 'Love using this platform for finding lawyers. Very helpful!',
-      status: 'resolved',
-      priority: 'low',
-      createdAt: '2024-01-13T16:45:00Z',
-      resolvedAt: '2024-01-13T17:00:00Z',
-    },
-  ];
+  const fetchFeedback = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/feedback', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to load feedback');
+      const data = await res.json();
+      setFeedbackData(data.data);
+    } catch (e) {
+      setError('Failed to load feedback');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const filteredFeedback = feedbackData.filter(feedback => {
+  useEffect(() => { fetchFeedback(); }, []);
+
+  const filteredFeedback = useMemo(() => feedbackData.filter(feedback => {
     const matchesSearch = feedback.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         feedback.user.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || feedback.type === filterType;
-    const matchesStatus = filterStatus === 'all' || feedback.status === filterStatus;
-    
+                         feedback.userEmail.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = filterType === 'all' || feedback.type === (filterType as any);
+    const matchesStatus = filterStatus === 'all' || feedback.status === (filterStatus as any);
     return matchesSearch && matchesType && matchesStatus;
-  });
+  }), [feedbackData, searchTerm, filterType, filterStatus]);
 
-  const handleStatusChange = (id: string, newStatus: 'pending' | 'resolved') => {
-    console.log(`Updating feedback ${id} to ${newStatus}`);
-    // Implementation would update the feedback status
+  const handleStatusChange = async (id: string, newStatus: 'pending' | 'resolved') => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:5000/api/feedback/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      await fetchFeedback();
+    } catch (e) {
+      alert('Failed to update feedback');
+    }
   };
 
   const getTypeColor = (type: string) => {
@@ -103,7 +100,6 @@ export const FeedbackManagement = () => {
     }
   };
 
-  // Analytics data
   const analytics = {
     totalFeedback: feedbackData.length,
     pendingCount: feedbackData.filter(f => f.status === 'pending').length,
@@ -115,7 +111,6 @@ export const FeedbackManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Analytics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -125,7 +120,7 @@ export const FeedbackManagement = () => {
           <CardContent>
             <div className="text-2xl font-bold">{analytics.bugCount}</div>
             <p className="text-xs text-muted-foreground">
-              {Math.round((analytics.bugCount / analytics.totalFeedback) * 100)}% of total feedback
+              {analytics.totalFeedback ? Math.round((analytics.bugCount / analytics.totalFeedback) * 100) : 0}% of total feedback
             </p>
           </CardContent>
         </Card>
@@ -138,7 +133,7 @@ export const FeedbackManagement = () => {
           <CardContent>
             <div className="text-2xl font-bold">{analytics.suggestionCount}</div>
             <p className="text-xs text-muted-foreground">
-              {Math.round((analytics.suggestionCount / analytics.totalFeedback) * 100)}% of total feedback
+              {analytics.totalFeedback ? Math.round((analytics.suggestionCount / analytics.totalFeedback) * 100) : 0}% of total feedback
             </p>
           </CardContent>
         </Card>
@@ -151,13 +146,12 @@ export const FeedbackManagement = () => {
           <CardContent>
             <div className="text-2xl font-bold">{analytics.generalCount}</div>
             <p className="text-xs text-muted-foreground">
-              {Math.round((analytics.generalCount / analytics.totalFeedback) * 100)}% of total feedback
+              {analytics.totalFeedback ? Math.round((analytics.generalCount / analytics.totalFeedback) * 100) : 0}% of total feedback
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle>Feedback Management</CardTitle>
@@ -196,7 +190,6 @@ export const FeedbackManagement = () => {
             </Select>
           </div>
 
-          {/* Feedback Table */}
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -212,8 +205,8 @@ export const FeedbackManagement = () => {
               </TableHeader>
               <TableBody>
                 {filteredFeedback.map((feedback) => (
-                  <TableRow key={feedback.id}>
-                    <TableCell className="font-medium">{feedback.user}</TableCell>
+                  <TableRow key={feedback._id}>
+                    <TableCell className="font-medium">{feedback.userEmail}</TableCell>
                     <TableCell>
                       <Badge className={getTypeColor(feedback.type)}>
                         {feedback.type}
@@ -254,7 +247,7 @@ export const FeedbackManagement = () => {
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
                                     <label className="text-sm font-medium">User</label>
-                                    <p className="text-sm text-gray-600">{selectedFeedback.user}</p>
+                                    <p className="text-sm text-gray-600">{selectedFeedback.userEmail}</p>
                                   </div>
                                   <div>
                                     <label className="text-sm font-medium">Type</label>
@@ -275,11 +268,11 @@ export const FeedbackManagement = () => {
                                 </div>
                                 <div>
                                   <label className="text-sm font-medium">Message</label>
-                                  <p className="text-sm text-gray-600">{selectedFeedback.message}</p>
+                                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{selectedFeedback.message}</p>
                                 </div>
                                 <div className="flex space-x-2">
                                   <Button
-                                    onClick={() => handleStatusChange(selectedFeedback.id, 'resolved')}
+                                    onClick={() => handleStatusChange(selectedFeedback._id, 'resolved')}
                                     disabled={selectedFeedback.status === 'resolved'}
                                     className="bg-teal hover:bg-teal-light text-white"
                                   >
@@ -288,7 +281,7 @@ export const FeedbackManagement = () => {
                                   </Button>
                                   <Button
                                     variant="outline"
-                                    onClick={() => handleStatusChange(selectedFeedback.id, 'pending')}
+                                    onClick={() => handleStatusChange(selectedFeedback._id, 'pending')}
                                     disabled={selectedFeedback.status === 'pending'}
                                   >
                                     <Clock className="h-4 w-4 mr-2" />
@@ -306,6 +299,9 @@ export const FeedbackManagement = () => {
               </TableBody>
             </Table>
           </div>
+
+          {loading && <div className="p-4 text-gray-600">Loading...</div>}
+          {error && <div className="p-4 text-red-600">{error}</div>}
         </CardContent>
       </Card>
     </div>
