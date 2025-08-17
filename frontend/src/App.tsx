@@ -24,6 +24,7 @@ import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
+import { CryptoDemo } from "./pages/CryptoDemo";
 import LawyerDashboard from "./pages/LawyerDashboard";
 import LawyerAppointments from "./pages/LawyerAppointments";
 import LawyerAllAppointments from "./pages/LawyerAllAppointments";
@@ -35,6 +36,8 @@ import LawyerProfile from "./pages/LawyerProfile";
 import LawyerPayments from "./pages/LawyerPayments";
 import LawyerReviews from "./pages/LawyerReviews";
 import LawyerSettings from "./pages/LawyerSettings";
+import Appointments from "./pages/Appointments";
+import ActiveClients from "./pages/ActiveClients";
 import OtpVerification from "./pages/OtpVerification";
 import AdminDashboard from "./pages/AdminDashboard";
 
@@ -158,6 +161,15 @@ const App = () => (
                   <Footer />
                 </>
               } />
+              <Route path="/crypto-demo" element={
+                <>
+                  <Navbar />
+                  <main className="flex-1">
+                    <CryptoDemo />
+                  </main>
+                  <Footer />
+                </>
+              } />
               <Route path="/login" element={
                 <>
                   <Navbar />
@@ -181,7 +193,7 @@ const App = () => (
                   </main>
                 </>
               } />
-              
+
               {/* Lawyer Panel Routes (Protected) */}
               <Route path="/lawyer-dashboard" element={
                 <ProtectedRoute requiredRole="lawyer">
@@ -238,14 +250,24 @@ const App = () => (
                   <LawyerSettings />
                 </ProtectedRoute>
               } />
-              
+              <Route path="/appointments" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <Appointments />
+                </ProtectedRoute>
+              } />
+              <Route path="/active-clients" element={
+                <ProtectedRoute requiredRole="lawyer">
+                  <ActiveClients />
+                </ProtectedRoute>
+              } />
+
               {/* Admin Panel Route (Protected) */}
               <Route path="/admin-dashboard" element={
                 <ProtectedRoute requiredRole="admin">
                   <AdminDashboard />
                 </ProtectedRoute>
               } />
-              
+
               {/* 404 Route */}
               <Route path="*" element={
                 <>

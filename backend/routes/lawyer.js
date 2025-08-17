@@ -11,7 +11,8 @@ const {
   updateMyAvailability,
   getMyAvailability,
   getPublicLawyerProfile,
-  getMyNotifications
+  getMyNotifications,
+  getLawyerClients
 } = require('../controllers/lawyerController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 
@@ -25,6 +26,9 @@ router.put('/me', protect, updateMyProfile);
 router.get('/me/notifications', protect, getMyNotifications);
 router.get('/me/availability', protect, getMyAvailability);
 router.put('/me/availability', protect, updateMyAvailability);
+
+// Get clients with active chat conversations for a lawyer
+router.get('/:lawyerId/clients', protect, getLawyerClients);
 
 // Protected routes (admin only)
 router.get('/all', protect, admin, getAllLawyers);

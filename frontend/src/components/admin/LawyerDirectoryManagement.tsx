@@ -32,31 +32,35 @@ export const LawyerDirectoryManagement = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterSpecialization, setFilterSpecialization] = useState('all');
   const [selectedLawyer, setSelectedLawyer] = useState<Lawyer | null>(null);
-  
-  const { 
-    lawyers, 
-    stats, 
-    loading, 
-    error, 
-    updateLawyerStatus, 
-    deleteLawyer 
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const {
+    lawyers,
+    stats,
+    loading,
+    error,
+    updateLawyerStatus,
+    deleteLawyer
   } = useLawyers('admin');
 
   const filteredLawyers = lawyers.filter(lawyer => {
     const fullName = `${lawyer.firstName} ${lawyer.lastName}`;
     const matchesSearch = fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lawyer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (lawyer.specialization && lawyer.specialization.toLowerCase().includes(searchTerm.toLowerCase()));
+      lawyer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lawyer.specialization && lawyer.specialization.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = filterStatus === 'all' || lawyer.status === filterStatus;
-    const matchesSpecialization = filterSpecialization === 'all' || 
-                                  (lawyer.specialization && lawyer.specialization.toLowerCase().includes(filterSpecialization.toLowerCase()));
-    
+    const matchesSpecialization = filterSpecialization === 'all' ||
+      (lawyer.specialization && lawyer.specialization.toLowerCase().includes(filterSpecialization.toLowerCase()));
+
     return matchesSearch && matchesStatus && matchesSpecialization;
   });
 
   const handleStatusChange = async (id: string, newStatus: 'pending' | 'approved' | 'rejected') => {
     try {
       await updateLawyerStatus(id, newStatus);
+      // Close the dialog after successful status change
+      setIsDialogOpen(false);
+      setSelectedLawyer(null);
     } catch (error) {
       console.error('Failed to update status:', error);
     }
@@ -65,8 +69,23 @@ export const LawyerDirectoryManagement = () => {
   const handleDeleteLawyer = async (id: string) => {
     try {
       await deleteLawyer(id);
+      // Close the dialog after successful deletion
+      setIsDialogOpen(false);
+      setSelectedLawyer(null);
     } catch (error) {
       console.error('Failed to delete lawyer:', error);
+    }
+  };
+
+  const handleViewLawyer = (lawyer: Lawyer) => {
+    setSelectedLawyer(lawyer);
+    setIsDialogOpen(true);
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      setIsDialogOpen(false);
+      setSelectedLawyer(null);
     }
   };
 
@@ -104,7 +123,7 @@ export const LawyerDirectoryManagement = () => {
   }
 
   const specializations = [
-    'Criminal Law', 'Family Law', 'Corporate Law', 'Real Estate', 
+    'Criminal Law', 'Family Law', 'Corporate Law', 'Real Estate',
     'Personal Injury', 'Immigration', 'Bankruptcy', 'Tax Law'
   ];
 
@@ -253,17 +272,16 @@ export const LawyerDirectoryManagement = () => {
                     <TableCell>{formatDate(lawyer.createdAt)}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedLawyer(lawyer)}
-                            >
-                              View
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-3xl">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewLawyer(lawyer)}
+                        >
+                          View
+                        </Button>
+
+                        <Dialog open={isDialogOpen && selectedLawyer?._id === lawyer._id} onOpenChange={handleDialogClose}>
+                          <DialogContent className="max-w-3xl" onEscapeKeyDown={() => handleDialogClose(false)} onInteractOutside={() => handleDialogClose(false)}>
                             <DialogHeader>
                               <DialogTitle>Lawyer Details</DialogTitle>
                             </DialogHeader>

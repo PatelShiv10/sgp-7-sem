@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Message = require('../models/Message');
 
 // Get all lawyers for admin dashboard
 exports.getAllLawyers = async (req, res) => {
@@ -300,5 +301,112 @@ exports.getPublicLawyerProfile = async (req, res) => {
   } catch (error) {
     console.error('Error fetching public lawyer profile:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch lawyer profile' });
+  }
+};
+
+// Get clients with active chat conversations for a lawyer
+exports.getLawyerClients = async (req, res) => {
+  try {
+    const { lawyerId } = req.params;
+    
+    // Validate that the lawyer exists and is a lawyer
+    const lawyer = await User.findById(lawyerId).select('role');
+    if (!lawyer || lawyer.role !== 'lawyer') {
+      return res.status(404).json({
+        success: false,
+        message: 'Lawyer not found'
+      });
+    }
+
+    // Get all unique clients who have exchanged messages with this lawyer
+    // We need to find messages where the lawyer is either sender or receiver
+    const clientIds = await Message.aggregate([
+      {
+        $match: {
+          $or: [
+            { senderId: lawyerId },
+            { receiverId: lawyerId }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ['$senderId', lawyerId] },
+              '$receiverId',
+              '$senderId'
+            ]
+          }
+        }
+      },
+      {
+        $project: {
+          clientId: '$_id'
+        }
+      }
+    ]);
+
+    if (clientIds.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No clients with active conversations found',
+        data: []
+      });
+    }
+
+    // Get the latest message timestamp for each client
+    const clientsWithLastMessage = await Promise.all(
+      clientIds.map(async ({ clientId }) => {
+        const lastMessage = await Message.findOne({
+          $or: [
+            { senderId: lawyerId, receiverId: clientId },
+            { senderId: clientId, receiverId: lawyerId }
+          ]
+        }).sort({ createdAt: -1 }).select('createdAt');
+
+        return {
+          clientId,
+          lastMessageAt: lastMessage ? lastMessage.createdAt : null
+        };
+      })
+    );
+
+    // Sort by last message timestamp (most recent first)
+    clientsWithLastMessage.sort((a, b) => {
+      if (!a.lastMessageAt) return 1;
+      if (!b.lastMessageAt) return -1;
+      return new Date(b.lastMessageAt) - new Date(a.lastMessageAt);
+    });
+
+    // Get client details for each clientId
+    const clientsWithDetails = await Promise.all(
+      clientsWithLastMessage.map(async ({ clientId, lastMessageAt }) => {
+        const client = await User.findById(clientId)
+          .select('firstName lastName email profileImage')
+          .lean();
+
+        return {
+          clientId,
+          clientDetails: client || null,
+          lastMessageAt
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      message: 'Clients with active conversations retrieved successfully',
+      data: clientsWithLastMessage,
+      clientsWithDetails
+    });
+
+  } catch (error) {
+    console.error('Error fetching lawyer clients:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch lawyer clients',
+      error: error.message
+    });
   }
 }; 
