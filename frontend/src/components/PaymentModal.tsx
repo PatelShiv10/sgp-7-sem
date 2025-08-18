@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { CreditCard, Banknote, DollarSign, Wallet, Loader2 } from 'lucide-react';
+import { CreditCard, Banknote, DollarSign, Wallet, Loader2, Star } from 'lucide-react';
 import axios from 'axios';
 
 interface PaymentModalProps {
@@ -18,6 +18,7 @@ interface PaymentModalProps {
   amount?: number;
   appointmentId?: string;
   onSuccess?: () => void;
+  showReviewButton?: boolean;
 }
 
 const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -27,7 +28,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   lawyerName,
   amount = 1000,
   appointmentId,
-  onSuccess
+  onSuccess,
+  showReviewButton = false
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -38,6 +40,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     description: `Payment for consultation with ${lawyerName}`,
     notes: ''
   });
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setPaymentData({
@@ -83,8 +86,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         description: `Payment of ₹${paymentData.amount} has been processed successfully.`,
       });
 
+      setPaymentSuccess(true);
       onSuccess?.();
-      onClose();
     } catch (error: any) {
       toast({
         title: "Payment Failed",
@@ -113,34 +116,93 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     }).format(amount);
   };
 
+  const handleWriteReview = () => {
+    window.location.href = `/review/${lawyerId}`;
+  };
+
+  const handleClose = () => {
+    setPaymentSuccess(false);
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Pay Lawyer
+            {paymentSuccess ? (
+              <>
+                <DollarSign className="h-5 w-5 text-green-600" />
+                Payment Successful!
+              </>
+            ) : (
+              <>
+                <DollarSign className="h-5 w-5" />
+                Pay Lawyer
+              </>
+            )}
           </DialogTitle>
           <DialogDescription>
-            Complete your payment to {lawyerName}
+            {paymentSuccess 
+              ? `Payment of ${formatAmount(paymentData.amount)} has been processed successfully.`
+              : `Complete your payment to ${lawyerName}`
+            }
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Amount */}
-          <div>
-            <Label htmlFor="amount">Amount (₹)</Label>
-            <Input
-              id="amount"
-              name="amount"
-              type="number"
-              value={paymentData.amount}
-              onChange={handleInputChange}
-              placeholder="Enter amount"
-              min="1"
-              required
-            />
+        {paymentSuccess ? (
+          <div className="space-y-4">
+            <div className="text-center py-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <DollarSign className="h-8 w-8 text-green-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-green-800 mb-2">
+                Payment Completed Successfully!
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Your payment of {formatAmount(paymentData.amount)} has been processed.
+              </p>
+            </div>
+
+            {showReviewButton && (
+              <div className="space-y-3">
+                <Button
+                  onClick={handleWriteReview}
+                  className="w-full bg-yellow-600 hover:bg-yellow-700"
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  Write a Review
+                </Button>
+                <p className="text-xs text-gray-500 text-center">
+                  Share your experience with {lawyerName}
+                </p>
+              </div>
+            )}
+
+            <Button
+              onClick={handleClose}
+              className="w-full"
+              variant="outline"
+            >
+              Close
+            </Button>
           </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Amount */}
+            <div>
+              <Label htmlFor="amount">Amount (₹)</Label>
+              <Input
+                id="amount"
+                name="amount"
+                type="number"
+                value={paymentData.amount}
+                onChange={handleInputChange}
+                placeholder="Enter amount"
+                min="1"
+                required
+              />
+            </div>
 
           {/* Payment Method */}
           <div>
@@ -226,35 +288,36 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              disabled={isProcessing}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handlePayment}
-              disabled={isProcessing || paymentData.amount <= 0}
-              className="flex-1"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Pay {formatAmount(paymentData.amount)}
-                </>
-              )}
-            </Button>
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                disabled={isProcessing}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handlePayment}
+                disabled={isProcessing || paymentData.amount <= 0}
+                className="flex-1"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Pay {formatAmount(paymentData.amount)}
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );

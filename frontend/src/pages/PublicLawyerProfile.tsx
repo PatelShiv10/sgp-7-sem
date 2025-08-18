@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Phone, MessageCircle, Calendar, Clock, DollarSign, Award, Users, CheckCircle, Shield, Loader2 } from 'lucide-react';
+import { MapPin, Star, Phone, MessageCircle, Calendar, Clock, DollarSign, Award, Users, CheckCircle, Shield, Loader2, Video } from 'lucide-react';
 import PaymentModal from '@/components/PaymentModal';
+import VideoCallInitiation from '@/components/VideoCallInitiation';
 
 interface PublicLawyer {
   _id: string;
@@ -26,6 +27,7 @@ const PublicLawyerProfile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showVideoCallModal, setShowVideoCallModal] = useState(false);
 
   useEffect(() => {
     const fetchLawyer = async () => {
@@ -72,6 +74,19 @@ const PublicLawyerProfile = () => {
 
   const handlePaymentClick = () => {
     setShowPaymentModal(true);
+  };
+
+  const handleWriteReview = () => {
+    window.location.href = `/review/${lawyer._id}`;
+  };
+
+  const handleVideoCallClick = () => {
+    setShowVideoCallModal(true);
+  };
+
+  const handleVideoCallInitiated = (callId: string) => {
+    setShowVideoCallModal(false);
+    // The VideoCallInitiation component will handle navigation
   };
 
   return (
@@ -156,6 +171,22 @@ const PublicLawyerProfile = () => {
               >
                 <DollarSign className="h-4 w-4 mr-2" />
                 Pay Lawyer
+              </Button>
+              <Button 
+                variant="outline" 
+                className="border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white"
+                onClick={handleWriteReview}
+              >
+                <Star className="h-4 w-4 mr-2" />
+                Write Review
+              </Button>
+              <Button 
+                variant="outline" 
+                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                onClick={handleVideoCallClick}
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Video Call
               </Button>
               <Button variant="outline" className="border-gray-300">
                 <Phone className="h-4 w-4 mr-2" />
@@ -279,7 +310,29 @@ const PublicLawyerProfile = () => {
           onSuccess={() => {
             setShowPaymentModal(false);
           }}
+          showReviewButton={true}
         />
+      )}
+
+      {/* Video Call Initiation Modal */}
+      {showVideoCallModal && lawyer && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowVideoCallModal(false)}
+              className="absolute top-2 right-2 z-10"
+            >
+              ×
+            </Button>
+            <VideoCallInitiation
+              lawyerId={lawyer._id}
+              lawyerName={fullName}
+              onCallInitiated={handleVideoCallInitiated}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

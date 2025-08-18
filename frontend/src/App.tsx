@@ -42,6 +42,7 @@ import ActiveClients from "./pages/ActiveClients";
 import UserAppointments from "./pages/UserAppointments";
 import OtpVerification from "./pages/OtpVerification";
 import AdminDashboard from "./pages/AdminDashboard";
+import ReviewSubmission from "./pages/ReviewSubmission";
 
 const queryClient = new QueryClient();
 
@@ -213,6 +214,7 @@ const App = () => (
               <Route path="/lawyer-settings" element={<LawyerSettings />} />
               <Route path="/appointments" element={<Appointments />} />
               <Route path="/my-appointments" element={<UserAppointments />} />
+              <Route path="/review/:lawyerId" element={<ReviewSubmission />} />
               <Route path="/active-clients" element={<ActiveClients />} />
 
               {/* Admin Panel Route */}

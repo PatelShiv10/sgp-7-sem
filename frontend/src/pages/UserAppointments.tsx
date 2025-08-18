@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Calendar, Clock, MapPin, Star, MessageCircle, DollarSign } from 'lucide-react';
+import { Calendar, Clock, MapPin, Star, MessageCircle, DollarSign, Video } from 'lucide-react';
 import axios from 'axios';
 import ReviewForm from '@/components/ReviewForm';
 import PaymentModal from '@/components/PaymentModal';
+import VideoCallInitiation from '@/components/VideoCallInitiation';
 
 interface Appointment {
   _id: string;
@@ -44,6 +45,8 @@ const UserAppointments: React.FC = () => {
   const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedLawyerForPayment, setSelectedLawyerForPayment] = useState<{id: string, name: string} | null>(null);
+  const [showVideoCallModal, setShowVideoCallModal] = useState(false);
+  const [selectedLawyerForVideoCall, setSelectedLawyerForVideoCall] = useState<{id: string, name: string} | null>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -130,6 +133,21 @@ const UserAppointments: React.FC = () => {
       title: "Success",
       description: "Payment completed successfully!",
     });
+  };
+
+  const handleWriteReview = (lawyerId: string) => {
+    window.location.href = `/review/${lawyerId}`;
+  };
+
+  const handleVideoCallClick = (lawyerId: string, lawyerName: string) => {
+    setSelectedLawyerForVideoCall({ id: lawyerId, name: lawyerName });
+    setShowVideoCallModal(true);
+  };
+
+  const handleVideoCallInitiated = (callId: string) => {
+    setShowVideoCallModal(false);
+    setSelectedLawyerForVideoCall(null);
+    // The VideoCallInitiation component will handle navigation
   };
 
   const canReview = (appointment: Appointment) => {
@@ -242,11 +260,19 @@ const UserAppointments: React.FC = () => {
                       </Dialog>
                     )}
                     
-                                                         {appointment.status === 'confirmed' && appointment.meetingType === 'video-call' && (
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                    Join Call
-                  </Button>
-                )}
+                                                                              {appointment.status === 'confirmed' && appointment.meetingType === 'video-call' && (
+                   <Button 
+                     size="sm" 
+                     className="bg-blue-600 hover:bg-blue-700"
+                     onClick={() => handleVideoCallClick(
+                       appointment.lawyerId._id,
+                       `${appointment.lawyerId.firstName} ${appointment.lawyerId.lastName}`
+                     )}
+                   >
+                     <Video className="h-4 w-4 mr-1" />
+                     Start Video Call
+                   </Button>
+                 )}
                 
                 <Button
                   variant="outline"
@@ -259,6 +285,16 @@ const UserAppointments: React.FC = () => {
                 >
                   <DollarSign className="h-4 w-4" />
                   Pay Lawyer
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleWriteReview(appointment.lawyerId._id)}
+                  className="flex items-center gap-1"
+                >
+                  <Star className="h-4 w-4" />
+                  Write Review
                 </Button>
                   </div>
                 </div>
@@ -280,7 +316,32 @@ const UserAppointments: React.FC = () => {
           lawyerName={selectedLawyerForPayment.name}
           amount={1500}
           onSuccess={handlePaymentSuccess}
+          showReviewButton={true}
         />
+      )}
+
+      {/* Video Call Initiation Modal */}
+      {selectedLawyerForVideoCall && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full relative">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowVideoCallModal(false);
+                setSelectedLawyerForVideoCall(null);
+              }}
+              className="absolute top-2 right-2 z-10"
+            >
+              ×
+            </Button>
+            <VideoCallInitiation
+              lawyerId={selectedLawyerForVideoCall.id}
+              lawyerName={selectedLawyerForVideoCall.name}
+              onCallInitiated={handleVideoCallInitiated}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
