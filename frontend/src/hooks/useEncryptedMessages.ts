@@ -9,7 +9,7 @@ import {
   markMessagesAsRead,
   deleteMessage,
   getUnreadCount,
-  generateChatId,
+  generateChatId as computeChatId,
   decryptReceivedMessage,
   type MessageResponse,
   type ChatInfo
@@ -17,7 +17,7 @@ import {
 
 export const useEncryptedMessages = () => {
   const { user } = useAuth();
-  const { getPrivateKey } = useCrypto();
+  const { getPrivateKey, getPeerKey } = useCrypto();
   const { toast } = useToast();
 
   const [messages, setMessages] = useState<MessageResponse[]>([]);
@@ -25,6 +25,7 @@ export const useEncryptedMessages = () => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [currentChatPeerPublicKey, setCurrentChatPeerPublicKey] = useState<string | null>(null);
 
   // Load user's chats on mount
   useEffect(() => {
@@ -80,6 +81,28 @@ export const useEncryptedMessages = () => {
         // Refresh unread count
         loadUnreadCount();
       }
+
+      // Determine peer user id from chatId and prefetch their public key
+      if (user?.id) {
+        const parts = chatId.split('_');
+        if (parts.length >= 3) {
+          const idA = parts[1];
+          const idB = parts[2];
+          const peerId = idA === user.id ? idB : idB === user.id ? idA : null;
+          if (peerId) {
+            try {
+              const peerKey = await getPeerKey(peerId);
+              setCurrentChatPeerPublicKey(peerKey?.publicKey || null);
+            } catch {
+              setCurrentChatPeerPublicKey(null);
+            }
+          } else {
+            setCurrentChatPeerPublicKey(null);
+          }
+        } else {
+          setCurrentChatPeerPublicKey(null);
+        }
+      }
     } catch (error) {
       console.error('Error loading chat messages:', error);
       toast({
@@ -110,7 +133,7 @@ export const useEncryptedMessages = () => {
       }
 
       // Generate chat ID
-      const chatId = generateChatId(user.id, receiverId);
+      const chatId = computeChatId(user.id, receiverId);
 
       // Send the encrypted message
       const sentMessage = await sendEncryptedMessage(
@@ -150,28 +173,29 @@ export const useEncryptedMessages = () => {
   }, [user?.id, getPrivateKey, currentChatId, loadUserChats, toast]);
 
   // Decrypt a received message
-  const decryptMessage = useCallback((
-    encryptedContent: string,
-    nonce: string,
-    senderPublicKey: string
-  ): string => {
+  const decryptForDisplay = useCallback((message: MessageResponse): string => {
     try {
       const privateKey = getPrivateKey();
-      if (!privateKey) {
-        throw new Error('Private key not found');
-      }
+      if (!privateKey) throw new Error('Private key not found');
+
+      const isOwn = message.senderId._id === (user?.id || '');
+      const publicKeyToUse = isOwn
+        ? (currentChatPeerPublicKey || '')
+        : message.senderPublicKey;
+
+      if (!publicKeyToUse) throw new Error('Missing public key for decryption');
 
       return decryptReceivedMessage(
-        encryptedContent,
-        nonce,
-        senderPublicKey,
+        message.encryptedContent,
+        message.nonce,
+        publicKeyToUse,
         privateKey
       );
     } catch (error) {
       console.error('Error decrypting message:', error);
       return '[Encrypted Message - Decryption Failed]';
     }
-  }, [getPrivateKey]);
+  }, [getPrivateKey, user?.id, currentChatPeerPublicKey]);
 
   // Delete a message
   const removeMessage = useCallback(async (messageId: string) => {
@@ -209,17 +233,14 @@ export const useEncryptedMessages = () => {
   const getDecryptedMessages = useCallback(() => {
     return messages.map(message => ({
       ...message,
-      decryptedContent: decryptMessage(
-        message.encryptedContent,
-        message.nonce,
-        message.senderPublicKey
-      )
+      id: (message as any).id || (message as any)._id,
+      decryptedContent: decryptForDisplay(message)
     }));
-  }, [messages, decryptMessage]);
+  }, [messages, decryptForDisplay]);
 
   // Start a new chat
   const startNewChat = useCallback((receiverId: string) => {
-    const chatId = generateChatId(user?.id || '', receiverId);
+    const chatId = computeChatId(user?.id || '', receiverId);
     setCurrentChatId(chatId);
     setMessages([]);
     return chatId;
@@ -241,10 +262,9 @@ export const useEncryptedMessages = () => {
     markAsRead,
     startNewChat,
     getDecryptedMessages,
-    decryptMessage,
 
     // Utilities
     generateChatId: useCallback((userId1: string, userId2: string) =>
-      generateChatId(userId1, userId2), [])
+      computeChatId(userId1, userId2), [])
   };
 };

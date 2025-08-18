@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   createAppointment,
   getLawyerAppointments,
+  getClientAppointments,
   getAppointmentById,
   updateAppointmentStatus,
   deleteAppointment
@@ -14,6 +15,9 @@ router.post('/', protect, createAppointment);
 
 // Get all appointments for a lawyer
 router.get('/lawyer/:lawyerId', protect, getLawyerAppointments);
+
+// Get all appointments for a client (user)
+router.get('/client/:clientId', protect, getClientAppointments);
 
 // Get appointment by ID
 router.get('/:appointmentId', protect, getAppointmentById);

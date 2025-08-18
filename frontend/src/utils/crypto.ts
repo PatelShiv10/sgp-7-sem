@@ -1,5 +1,5 @@
 import nacl from 'tweetnacl';
-import { encodeBase64, decodeBase64 } from 'tweetnacl-util';
+import { encodeBase64, decodeBase64, encodeUTF8, decodeUTF8 } from 'tweetnacl-util';
 
 export interface KeyPair {
   publicKey: string;
@@ -226,7 +226,7 @@ export const encryptMessage = (message: string, recipientPublicKey: string, send
     const nonce = nacl.randomBytes(24);
 
     const encrypted = nacl.box(
-      nacl.util.decodeUTF8(message),
+      decodeUTF8(message),
       nonce,
       decodeBase64(recipientPublicKey),
       decodeBase64(senderPrivateKey)
@@ -263,7 +263,7 @@ export const decryptMessage = (encryptedData: string, senderPublicKey: string, r
       throw new Error('Failed to decrypt message');
     }
 
-    return nacl.util.encodeUTF8(decrypted);
+    return encodeUTF8(decrypted);
   } catch (error) {
     console.error('Error decrypting message:', error);
     throw new Error('Failed to decrypt message');

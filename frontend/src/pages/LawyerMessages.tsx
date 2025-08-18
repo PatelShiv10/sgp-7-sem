@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,8 +8,8 @@ import { Send, Search } from 'lucide-react';
 import { LawyerSidebar } from '@/components/lawyer/LawyerSidebar';
 import { LawyerTopBar } from '@/components/lawyer/LawyerTopBar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEncryptedMessages } from '@/hooks/useEncryptedMessages';
 
-interface Message { _id: string; sender: 'user'|'lawyer'; text: string; createdAt: string }
 interface ConversationPreview { userId: string; name: string; unread: number; lastMessage?: string; lastTime?: string }
 
 const LawyerMessages = () => {
@@ -19,14 +19,14 @@ const LawyerMessages = () => {
 
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const { generateChatId, loadChatMessages, sendMessage, getDecryptedMessages } = useEncryptedMessages();
 
   const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  useEffect(scrollToBottom, [messages]);
+  useEffect(scrollToBottom, [getDecryptedMessages]);
 
   useEffect(() => {
     const loadConversations = async () => {
@@ -55,24 +55,8 @@ const LawyerMessages = () => {
       try {
         setLoading(true);
         setError(null);
-        const token = localStorage.getItem('token');
-        const params = new URLSearchParams({ lawyerId, userId: selectedUserId });
-        const res = await fetch(`http://localhost:5000/api/chat/conversation?${params.toString()}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error('Failed to fetch conversation');
-        const data = await res.json();
-        setMessages(data.data);
-        // Refresh conversation list to update unread counts
-        try {
-          const listRes = await fetch('http://localhost:5000/api/chat/conversations', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-          });
-          if (listRes.ok) {
-            const listData = await listRes.json();
-            setConversations(listData.data);
-          }
-        } catch {}
+        const chatId = generateChatId(lawyerId, selectedUserId);
+        await loadChatMessages(chatId);
       } catch (e) {
         setError('Failed to load conversation');
       } finally {
@@ -84,23 +68,13 @@ const LawyerMessages = () => {
 
   const handleSendMessage = async () => {
     if (!message.trim() || !lawyerId || !selectedUserId) return;
-    const optimistic: Message = { _id: 'temp-' + Date.now(), sender: 'lawyer', text: message, createdAt: new Date().toISOString() };
-    setMessages(prev => [...prev, optimistic]);
+    const text = message;
     setMessage('');
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/chat/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ lawyerId, userId: selectedUserId, text: optimistic.text })
-      });
-      if (!res.ok) throw new Error('Failed to send');
-      const { data } = await res.json();
-      setMessages(prev => prev.map(m => m._id === optimistic._id ? data : m));
-    } catch (e) {
-      setMessages(prev => prev.filter(m => m._id !== optimistic._id));
-      alert('Failed to send message');
-    }
+      await sendMessage(text, selectedUserId);
+      const chatId = generateChatId(lawyerId, selectedUserId);
+      await loadChatMessages(chatId);
+    } catch {}
   };
 
   return (
@@ -165,18 +139,21 @@ const LawyerMessages = () => {
                   <div className="flex-1 p-4 space-y-4 overflow-y-auto">
                     {loading && <div className="text-center text-gray-500">Loading...</div>}
                     {error && <div className="text-center text-red-600">{error}</div>}
-                    {messages.map((msg) => (
-                      <div key={msg._id} className={`flex ${msg.sender === 'lawyer' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                          msg.sender === 'lawyer' ? 'bg-teal text-white' : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          <p className="text-sm">{msg.text}</p>
-                          <p className={`text-xs mt-1 ${msg.sender === 'lawyer' ? 'text-teal-100' : 'text-gray-500'}`}>
-                            {new Date(msg.createdAt).toLocaleTimeString()}
-                          </p>
+                    {getDecryptedMessages().map((msg) => {
+                      const isLawyer = msg.senderId._id === lawyerId;
+                      return (
+                        <div key={msg.id} className={`flex ${isLawyer ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                            isLawyer ? 'bg-teal text-white' : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            <p className="text-sm">{(msg as any).decryptedContent}</p>
+                            <p className={`text-xs mt-1 ${isLawyer ? 'text-teal-100' : 'text-gray-500'}`}>
+                              {new Date(msg.createdAt).toLocaleTimeString()}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     <div ref={endRef} />
                   </div>
 

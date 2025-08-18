@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Message = require('../models/Message');
+const mongoose = require('mongoose');
 
 // Get all lawyers for admin dashboard
 exports.getAllLawyers = async (req, res) => {
@@ -308,6 +309,7 @@ exports.getPublicLawyerProfile = async (req, res) => {
 exports.getLawyerClients = async (req, res) => {
   try {
     const { lawyerId } = req.params;
+    const lawyerObjectId = new mongoose.Types.ObjectId(lawyerId);
     
     // Validate that the lawyer exists and is a lawyer
     const lawyer = await User.findById(lawyerId).select('role');
@@ -324,8 +326,8 @@ exports.getLawyerClients = async (req, res) => {
       {
         $match: {
           $or: [
-            { senderId: lawyerId },
-            { receiverId: lawyerId }
+            { senderId: lawyerObjectId },
+            { receiverId: lawyerObjectId }
           ]
         }
       },
@@ -333,7 +335,7 @@ exports.getLawyerClients = async (req, res) => {
         $group: {
           _id: {
             $cond: [
-              { $eq: ['$senderId', lawyerId] },
+              { $eq: ['$senderId', lawyerObjectId] },
               '$receiverId',
               '$senderId'
             ]
@@ -360,10 +362,12 @@ exports.getLawyerClients = async (req, res) => {
       clientIds.map(async ({ clientId }) => {
         const lastMessage = await Message.findOne({
           $or: [
-            { senderId: lawyerId, receiverId: clientId },
-            { senderId: clientId, receiverId: lawyerId }
+            { senderId: lawyerObjectId, receiverId: clientId },
+            { senderId: clientId, receiverId: lawyerObjectId }
           ]
-        }).sort({ createdAt: -1 }).select('createdAt');
+        })
+          .sort({ createdAt: -1 })
+          .select('createdAt');
 
         return {
           clientId,

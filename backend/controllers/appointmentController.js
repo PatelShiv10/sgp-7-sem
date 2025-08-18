@@ -193,6 +193,72 @@ exports.getLawyerAppointments = async (req, res) => {
   }
 };
 
+// Get all appointments for a client (user)
+exports.getClientAppointments = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    const { status, startDate, endDate, page = 1, limit = 20 } = req.query;
+
+    // Validate client exists
+    const client = await User.findById(clientId).select('role');
+    if (!client || client.role !== 'user') {
+      return res.status(404).json({
+        success: false,
+        message: 'Client not found'
+      });
+    }
+
+    // Build query
+    const query = { clientId };
+    if (status) {
+      query.status = status;
+    }
+    if (startDate || endDate) {
+      query.startsAt = {};
+      if (startDate) query.startsAt.$gte = new Date(startDate);
+      if (endDate) query.startsAt.$lte = new Date(endDate);
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [appointments, total] = await Promise.all([
+      Appointment.find(query)
+        .populate('lawyerId', 'firstName lastName email')
+        .populate('clientId', 'firstName lastName email')
+        .sort({ startsAt: 1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Appointment.countDocuments(query)
+    ]);
+
+    const totalPages = Math.ceil(total / parseInt(limit));
+
+    res.json({
+      success: true,
+      message: 'Client appointments retrieved successfully',
+      data: {
+        appointments,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalItems: total,
+          hasNextPage: parseInt(page) < totalPages,
+          hasPrevPage: parseInt(page) > 1,
+          limit: parseInt(limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching client appointments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch appointments',
+      error: error.message
+    });
+  }
+};
+
 // Get appointment by ID
 exports.getAppointmentById = async (req, res) => {
   try {

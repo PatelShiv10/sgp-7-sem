@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Booking = require('../models/Booking');
+const Appointment = require('../models/Appointment');
 
 function toMinutes(hhmm) {
   const [h, m] = hhmm.split(':').map(Number);
@@ -78,7 +79,7 @@ exports.getExpandedSlots = async (req, res) => {
 
 exports.createBooking = async (req, res) => {
   try {
-    const { lawyerId, date, start, durationMins = 30 } = req.body;
+    const { lawyerId, date, start, durationMins = 30, notes } = req.body;
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     if (!lawyerId || !date || !start) {
@@ -97,12 +98,37 @@ exports.createBooking = async (req, res) => {
     const dayName = dayNames[d.getDay()];
     const daySchedule = (lawyer.availability || []).find(x => x.day === dayName);
     const validSlots = new Set(expandDaySlots(daySchedule, 30));
-    if (!validSlots.has(start)) {
+    // If availability exists for the day, enforce slot validation.
+    // If no availability configured, allow booking any provided time for flexibility.
+    if (validSlots.size > 0 && !validSlots.has(start)) {
       return res.status(400).json({ success: false, message: 'Selected time is not available' });
     }
 
     // Try to create booking (unique index prevents double-booking)
     const booking = await Booking.create({ lawyerId, userId, date, start, durationMins, status: 'confirmed' });
+
+    // Also create an Appointment record so it appears in lawyer's dashboard
+    try {
+      const startsAt = new Date(`${date}T${start}:00`);
+      const endsAt = new Date(startsAt.getTime() + durationMins * 60000);
+
+      const appointment = new Appointment({
+        lawyerId,
+        clientId: userId,
+        startsAt,
+        endsAt,
+        status: 'confirmed',
+        notes: notes || '',
+        meetingType: 'video-call',
+        location: '',
+        meetingLink: ''
+      });
+      await appointment.save();
+    } catch (e) {
+      // Log but don't fail booking
+      console.warn('Failed to create mirrored appointment from booking:', e);
+    }
+
     res.status(201).json({ success: true, message: 'Booking confirmed', data: booking });
   } catch (error) {
     if (error.code === 11000) {

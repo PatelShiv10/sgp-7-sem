@@ -22,7 +22,7 @@ const fmtDate = (d: Date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-const AppointmentBooking = () => {
+const AppointmentBookingNew = () => {
   const { lawyerId } = useParams();
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState('');
@@ -40,7 +40,7 @@ const AppointmentBooking = () => {
     const loadLawyer = async () => {
       try {
         setLoadingLawyer(true);
-        const res = await fetch(`http://localhost:5000/api/lawyers/${lawyerId}/public`);
+        const res = await fetch(`/api/lawyers/${lawyerId}/public`);
         if (!res.ok) throw new Error('Failed to load');
         const data = await res.json();
         setLawyer(data.data);
@@ -60,7 +60,7 @@ const AppointmentBooking = () => {
       const start = new Date(month.getFullYear(), month.getMonth(), 1);
       const end = new Date(month.getFullYear(), month.getMonth() + 1, 0);
       const qs = `start=${fmtDate(start)}&end=${fmtDate(end)}`;
-      const res = await fetch(`http://localhost:5000/api/bookings/lawyers/${lawyerId}/slots?${qs}`);
+      const res = await fetch(`/api/bookings/lawyers/${lawyerId}/slots?${qs}`);
       if (!res.ok) throw new Error('Failed to load slots');
       const data = await res.json();
       setSlots(data.data);
@@ -77,6 +77,15 @@ const AppointmentBooking = () => {
       loadSlots();
     }
   }, [loadSlots, lawyerId]);
+
+  // Auto-select today's date when page loads if not selected
+  useEffect(() => {
+    if (!selectedDate) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      setSelectedDate(new Date(today));
+    }
+  }, [selectedDate]);
 
   const availableTimeSlots = useMemo(() => {
     if (!selectedDate) return [] as string[];
@@ -97,26 +106,30 @@ const AppointmentBooking = () => {
     return [];
   }, [selectedDate, slots]);
 
-  const disabled = useMemo(() => {
-    // If slots are returned, only enable dates that have available slots.
-    // If no slots are returned (no availability configured), allow all future dates.
-    const activeDates = new Set(slots.filter(s => s.slots.length > 0).map(s => s.date));
-    return (date: Date) => {
-      const today = new Date(); today.setHours(0,0,0,0);
-      const isPast = date < today;
-      if (isPast) return true;
-      if (slots.length === 0) return false;
-      return !activeDates.has(fmtDate(date));
-    };
-  }, [slots]);
+  // Auto-select the first available time when a date is chosen
+  useEffect(() => {
+    if (selectedDate) {
+      const first = availableTimeSlots[0];
+      if (first && !selectedTime) {
+        setSelectedTime(first);
+      }
+    }
+  }, [selectedDate, availableTimeSlots]);
+
+  const disableBeforeToday = useMemo(() => {
+    const d = new Date(); d.setHours(0,0,0,0);
+    return { before: d } as const;
+  }, []);
 
   const handleBookAppointment = async () => {
-    if (!selectedDate || !selectedTime || !caseDescription.trim() || !lawyerId) return;
+    if (!selectedDate || !lawyerId) return;
 
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/bookings', {
+      const timeToBook = selectedTime || (availableTimeSlots[0] || '10:00');
+
+      const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -125,9 +138,9 @@ const AppointmentBooking = () => {
         body: JSON.stringify({
           lawyerId,
           date: fmtDate(selectedDate),
-          start: selectedTime.split(' ')[0],
+          start: timeToBook,
           durationMins: 60,
-          notes: caseDescription
+          notes: caseDescription || ''
         })
       });
       if (!res.ok) {
@@ -232,7 +245,7 @@ const AppointmentBooking = () => {
                     onSelect={(d) => { setSelectedDate(d); setSelectedTime(''); }}
                     month={month}
                     onMonthChange={setMonth}
-                    disabled={disabled}
+                    disabled={disableBeforeToday}
                     className="rounded-md border"
                   />
                   {loadingSlots && (
@@ -315,7 +328,7 @@ const AppointmentBooking = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Time:</span>
-                    <span className="font-medium">{selectedTime || 'Not selected'}</span>
+                    <span className="font-medium">{selectedTime || (availableTimeSlots[0] ? `${availableTimeSlots[0]} (auto)` : 'Auto (10:00)')}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Duration:</span>
@@ -331,7 +344,7 @@ const AppointmentBooking = () => {
                 <div className="space-y-3 pt-4">
                   <Button
                     onClick={handleBookAppointment}
-                    disabled={!selectedDate || !selectedTime || !caseDescription.trim() || isLoading}
+                    disabled={!selectedDate || isLoading}
                     className="w-full bg-teal hover:bg-teal-light text-white"
                   >
                     <CreditCard className="h-4 w-4 mr-2" />
@@ -350,4 +363,6 @@ const AppointmentBooking = () => {
   );
 };
 
-export default AppointmentBooking;
+export default AppointmentBookingNew;
+
+

@@ -1,84 +1,49 @@
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Send, ArrowLeft, Phone, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
-interface Message {
-  _id: string;
-  text: string;
-  sender: 'user' | 'lawyer';
-  createdAt: string;
-}
+import { useEncryptedMessages } from '@/hooks/useEncryptedMessages';
 
 const ChatWithLawyer = () => {
   const { lawyerId } = useParams();
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const {
+    loadChatMessages,
+    sendMessage,
+    getDecryptedMessages,
+    generateChatId,
+  } = useEncryptedMessages();
+  const decryptedMessages = getDecryptedMessages();
 
   const userId = user?.id;
 
   const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  useEffect(scrollToBottom, [messages]);
+  useEffect(scrollToBottom, [decryptedMessages.length]);
 
   useEffect(() => {
-    const fetchConversation = async () => {
-      try {
-        if (!lawyerId || !userId) return;
-        setLoading(true);
-        setError(null);
-        const token = localStorage.getItem('token');
-        const params = new URLSearchParams({ lawyerId, userId });
-        const res = await fetch(`http://localhost:5000/api/chat/conversation?${params.toString()}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!res.ok) throw new Error('Failed to load messages');
-        const data = await res.json();
-        setMessages(data.data);
-      } catch (e) {
-        setError('Failed to load conversation');
-      } finally {
-        setLoading(false);
-      }
+    const init = async () => {
+      if (!lawyerId || !userId) return;
+      const chatId = generateChatId(userId, lawyerId);
+      await loadChatMessages(chatId);
     };
-    fetchConversation();
-  }, [lawyerId, userId]);
+    init();
+  }, [lawyerId, userId, loadChatMessages, generateChatId]);
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !lawyerId || !userId) return;
-    const optimistic: Message = {
-      _id: 'temp-' + Date.now(),
-      text: inputText,
-      sender: 'user',
-      createdAt: new Date().toISOString()
-    };
-    setMessages(prev => [...prev, optimistic]);
+    const text = inputText;
     setInputText('');
-
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/chat/message', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ lawyerId, userId, text: optimistic.text })
-      });
-      if (!res.ok) throw new Error('Failed to send');
-      const { data } = await res.json();
-      setMessages(prev => prev.map(m => m._id === optimistic._id ? data : m));
-    } catch (e) {
-      setMessages(prev => prev.filter(m => m._id !== optimistic._id));
-      alert('Failed to send message');
-    }
+      await sendMessage(text, lawyerId);
+      const chatId = generateChatId(userId, lawyerId);
+      await loadChatMessages(chatId);
+    } catch {}
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -134,7 +99,7 @@ const ChatWithLawyer = () => {
               </Link>
             </Button>
             <Button asChild size="sm" className="bg-teal hover:bg-teal-light text-white">
-              <Link to={`/booking/${lawyerId}`}>Book Consultation</Link>
+              <Link to={`/booking-new/${lawyerId}`}>Book Consultation</Link>
             </Button>
           </div>
         </div>
@@ -145,29 +110,28 @@ const ChatWithLawyer = () => {
             <Card className="flex-1 shadow-soft border-0 flex flex-col">
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {loading && <div className="text-center text-gray-500">Loading...</div>}
-                {error && <div className="text-center text-red-600">{error}</div>}
-                {messages.map((message) => (
-                  <div
-                    key={message._id}
-                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className={`max-w-[70%] ${message.sender === 'user' ? 'order-2' : 'order-1'}`}>
-                      <div className={`p-4 rounded-lg ${
-                        message.sender === 'user' 
-                          ? 'bg-teal text-white' 
-                          : 'bg-gray-100'
-                      }`}>
-                        <p className="leading-relaxed">{message.text}</p>
-                      </div>
-                      <div className={`text-xs text-gray-500 mt-1 ${
-                        message.sender === 'user' ? 'text-right' : 'text-left'
-                      }`}>
-                        {new Date(message.createdAt).toLocaleTimeString()}
+                {decryptedMessages.map((message) => {
+                  const isOwn = message.senderId._id === userId;
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`max-w-[70%] ${isOwn ? 'order-2' : 'order-1'}`}>
+                        <div className={`p-4 rounded-lg ${
+                          isOwn ? 'bg-teal text-white' : 'bg-gray-100'
+                        }`}>
+                          <p className="leading-relaxed">{(message as any).decryptedContent}</p>
+                        </div>
+                        <div className={`text-xs text-gray-500 mt-1 ${
+                          isOwn ? 'text-right' : 'text-left'
+                        }`}>
+                          {new Date(message.createdAt).toLocaleTimeString()}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div ref={endRef} />
               </div>
 

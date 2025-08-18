@@ -132,7 +132,7 @@ const PublicLawyerProfile = () => {
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 mt-6">
               <Button asChild className="flex-1 bg-teal hover:bg-teal-light text-white">
-                <Link to={`/booking/${lawyer._id}`}>
+                <Link to={`/booking-new/${lawyer._id}`}>
                   <Calendar className="h-4 w-4 mr-2" />
                   Book Consultation
                 </Link>

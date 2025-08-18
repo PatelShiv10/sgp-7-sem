@@ -18,6 +18,7 @@ import DocumentQA from "./pages/DocumentQA";
 import FindLawyer from "./pages/FindLawyer";
 import PublicLawyerProfile from "./pages/PublicLawyerProfile";
 import AppointmentBooking from "./pages/AppointmentBooking";
+import AppointmentBookingNew from "./pages/AppointmentBookingNew";
 import ChatWithLawyer from "./pages/ChatWithLawyer";
 import VideoCall from "./pages/VideoCall";
 import Contact from "./pages/Contact";
@@ -38,6 +39,7 @@ import LawyerReviews from "./pages/LawyerReviews";
 import LawyerSettings from "./pages/LawyerSettings";
 import Appointments from "./pages/Appointments";
 import ActiveClients from "./pages/ActiveClients";
+import UserAppointments from "./pages/UserAppointments";
 import OtpVerification from "./pages/OtpVerification";
 import AdminDashboard from "./pages/AdminDashboard";
 
@@ -130,6 +132,15 @@ const App = () => (
                   <Navbar />
                   <main className="flex-1">
                     <AppointmentBooking />
+                  </main>
+                  <Footer />
+                </>
+              } />
+              <Route path="/booking-new/:lawyerId" element={
+                <>
+                  <Navbar />
+                  <main className="flex-1">
+                    <AppointmentBookingNew />
                   </main>
                   <Footer />
                 </>
@@ -253,6 +264,11 @@ const App = () => (
               <Route path="/appointments" element={
                 <ProtectedRoute requiredRole="lawyer">
                   <Appointments />
+                </ProtectedRoute>
+              } />
+              <Route path="/my-appointments" element={
+                <ProtectedRoute requiredRole="user">
+                  <UserAppointments />
                 </ProtectedRoute>
               } />
               <Route path="/active-clients" element={
