@@ -154,14 +154,8 @@ const App = () => (
                   <Footer />
                 </>
               } />
-              <Route path="/video-call/:sessionId" element={
-                <>
-                  <Navbar />
-                  <main className="flex-1">
-                    <VideoCall />
-                  </main>
-                  <Footer />
-                </>
+              <Route path="/video-call/:callId" element={
+                <VideoCall />
               } />
               <Route path="/contact" element={
                 <>
@@ -205,84 +199,24 @@ const App = () => (
                 </>
               } />
 
-              {/* Lawyer Panel Routes (Protected) */}
-              <Route path="/lawyer-dashboard" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/lawyer-appointments" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerAppointments />
-                </ProtectedRoute>
-              } />
-              <Route path="/lawyer-all-appointments" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerAllAppointments />
-                </ProtectedRoute>
-              } />
-              <Route path="/lawyer-clients" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerClients />
-                </ProtectedRoute>
-              } />
-              <Route path="/lawyer-messages" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerMessages />
-                </ProtectedRoute>
-              } />
-              <Route path="/lawyer-video-calls" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerVideoCalls />
-                </ProtectedRoute>
-              } />
-              <Route path="/lawyer-documents" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerDocuments />
-                </ProtectedRoute>
-              } />
-              <Route path="/lawyer-profile" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerProfile />
-                </ProtectedRoute>
-              } />
-              <Route path="/lawyer-payments" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerPayments />
-                </ProtectedRoute>
-              } />
-              <Route path="/lawyer-reviews" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerReviews />
-                </ProtectedRoute>
-              } />
-              <Route path="/lawyer-settings" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <LawyerSettings />
-                </ProtectedRoute>
-              } />
-              <Route path="/appointments" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <Appointments />
-                </ProtectedRoute>
-              } />
-              <Route path="/my-appointments" element={
-                <ProtectedRoute requiredRole="user">
-                  <UserAppointments />
-                </ProtectedRoute>
-              } />
-              <Route path="/active-clients" element={
-                <ProtectedRoute requiredRole="lawyer">
-                  <ActiveClients />
-                </ProtectedRoute>
-              } />
+              {/* Lawyer Panel Routes */}
+              <Route path="/lawyer-dashboard" element={<LawyerDashboard />} />
+              <Route path="/lawyer-appointments" element={<LawyerAppointments />} />
+              <Route path="/lawyer-all-appointments" element={<LawyerAllAppointments />} />
+              <Route path="/lawyer-clients" element={<LawyerClients />} />
+              <Route path="/lawyer-messages" element={<LawyerMessages />} />
+              <Route path="/lawyer-video-calls" element={<LawyerVideoCalls />} />
+              <Route path="/lawyer-documents" element={<LawyerDocuments />} />
+              <Route path="/lawyer-profile" element={<LawyerProfile />} />
+              <Route path="/lawyer-payments" element={<LawyerPayments />} />
+              <Route path="/lawyer-reviews" element={<LawyerReviews />} />
+              <Route path="/lawyer-settings" element={<LawyerSettings />} />
+              <Route path="/appointments" element={<Appointments />} />
+              <Route path="/my-appointments" element={<UserAppointments />} />
+              <Route path="/active-clients" element={<ActiveClients />} />
 
-              {/* Admin Panel Route (Protected) */}
-              <Route path="/admin-dashboard" element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } />
+              {/* Admin Panel Route */}
+              <Route path="/admin-dashboard" element={<AdminDashboard />} />
 
               {/* 404 Route */}
               <Route path="*" element={

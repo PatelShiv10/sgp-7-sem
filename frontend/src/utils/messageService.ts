@@ -1,4 +1,4 @@
-import { encryptMessage, getPeerPublicKey } from './crypto';
+import { encryptMessage, getPeerPublicKey, decryptMessage } from './crypto';
 import type { PeerPublicKey } from './crypto';
 
 export interface SendMessageRequest {
@@ -6,12 +6,14 @@ export interface SendMessageRequest {
   receiverId: string;
   encryptedContent: string;
   nonce: string;
+  ephemeralPublicKey: string;
   messageType?: 'text' | 'file' | 'image';
   metadata?: Record<string, any>;
 }
 
 export interface MessageResponse {
-  id: string;
+  id?: string;
+  _id?: string;
   chatId: string;
   senderId: {
     _id: string;
@@ -33,6 +35,7 @@ export interface MessageResponse {
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
+  ephemeralPublicKey?: string; // Added for new encryption format
 }
 
 export interface ChatInfo {
@@ -61,10 +64,10 @@ export const sendEncryptedMessage = async (
       throw new Error(`No public key found for receiver: ${receiverId}`);
     }
 
-    // Encrypt the message
+    // Encrypt the message using the new encryption method
     const encryptedData = encryptMessage(message, peerKey.publicKey, senderPrivateKey);
     
-    // Parse the encrypted data to extract content and nonce
+    // Parse the encrypted data to extract content, nonce, and ephemeral public key
     const parsedData = JSON.parse(encryptedData);
     
     // Prepare the request payload
@@ -73,6 +76,7 @@ export const sendEncryptedMessage = async (
       receiverId,
       encryptedContent: parsedData.encrypted,
       nonce: parsedData.nonce,
+      ephemeralPublicKey: parsedData.ephemeralPublicKey,
       messageType,
       metadata
     };
@@ -98,7 +102,12 @@ export const sendEncryptedMessage = async (
     }
 
     const data = await response.json();
-    return data.data;
+    
+    // Add the ephemeral public key to the response for proper decryption
+    const messageResponse = data.data;
+    messageResponse.ephemeralPublicKey = parsedData.ephemeralPublicKey;
+    
+    return messageResponse;
 
   } catch (error) {
     console.error('Error sending encrypted message:', error);
@@ -280,23 +289,27 @@ export const generateChatId = (userId1: string, userId2: string): string => {
 export const decryptReceivedMessage = (
   encryptedContent: string,
   nonce: string,
-  senderPublicKey: string,
+  ephemeralPublicKey: string,
   recipientPrivateKey: string
 ): string => {
   try {
-    // Reconstruct the encrypted data structure
+    // Reconstruct the encrypted data structure exactly as it was created by encryptMessage
     const encryptedData = JSON.stringify({
       encrypted: encryptedContent,
-      nonce: nonce
+      nonce: nonce,
+      ephemeralPublicKey: ephemeralPublicKey
     });
 
-    // Import the decrypt function
-    const { decryptMessage } = require('./crypto');
+    // Decrypt the message - ephemeralPublicKey is already included in the JSON data
+    const decryptedContent = decryptMessage(encryptedData, '', recipientPrivateKey);
     
-    // Decrypt the message
-    return decryptMessage(encryptedData, senderPublicKey, recipientPrivateKey);
+    if (!decryptedContent) {
+      throw new Error('Decryption returned empty content');
+    }
+    
+    return decryptedContent;
   } catch (error) {
     console.error('Error decrypting received message:', error);
-    throw new Error('Failed to decrypt message');
+    throw new Error(`Failed to decrypt message: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };

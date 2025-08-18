@@ -72,6 +72,21 @@ export const useEncryptedMessages = () => {
     try {
       setIsLoading(true);
       const result = await getChatMessages(chatId, limit, offset);
+      
+      console.log('📨 Received messages from backend:', {
+        chatId,
+        messageCount: result.messages.length,
+        messages: result.messages.map(msg => ({
+          id: msg.id || msg._id,
+          hasEphemeralKey: !!(msg as any).ephemeralPublicKey,
+          ephemeralKeyValue: (msg as any).ephemeralPublicKey,
+          hasEncryptedContent: !!msg.encryptedContent,
+          hasNonce: !!msg.nonce,
+          keys: Object.keys(msg),
+          fullMessage: msg // Log the full message for debugging
+        }))
+      });
+      
       setMessages(result.messages);
       setCurrentChatId(chatId);
 
@@ -176,26 +191,58 @@ export const useEncryptedMessages = () => {
   const decryptForDisplay = useCallback((message: MessageResponse): string => {
     try {
       const privateKey = getPrivateKey();
-      if (!privateKey) throw new Error('Private key not found');
+      if (!privateKey) {
+        console.error('Private key not found for decryption');
+        return '[Encrypted Message - Private Key Not Found]';
+      }
 
-      const isOwn = message.senderId._id === (user?.id || '');
-      const publicKeyToUse = isOwn
-        ? (currentChatPeerPublicKey || '')
-        : message.senderPublicKey;
+      // Check if we have the ephemeral public key for this message
+      const ephemeralPublicKey = (message as any).ephemeralPublicKey;
+      
+      // Handle legacy messages that don't have ephemeral keys
+      if (!ephemeralPublicKey || ephemeralPublicKey === 'LEGACY_MESSAGE_NO_EPHEMERAL_KEY') {
+        console.warn('Legacy message detected - cannot decrypt with new system', {
+          messageId: message.id,
+          hasEphemeralKey: !!ephemeralPublicKey,
+          ephemeralKeyValue: ephemeralPublicKey,
+          messageKeys: Object.keys(message)
+        });
+        return '[Encrypted Message - Legacy Message (Cannot Decrypt)]';
+      }
 
-      if (!publicKeyToUse) throw new Error('Missing public key for decryption');
+      console.log('🔐 Attempting to decrypt message:', {
+        messageId: message.id,
+        hasPrivateKey: !!privateKey,
+        hasEphemeralKey: !!ephemeralPublicKey,
+        ephemeralKeyValue: ephemeralPublicKey,
+        encryptedContentLength: message.encryptedContent?.length,
+        nonceLength: message.nonce?.length,
+        encryptedContent: message.encryptedContent,
+        nonce: message.nonce
+      });
 
-      return decryptReceivedMessage(
+      const decryptedContent = decryptReceivedMessage(
         message.encryptedContent,
         message.nonce,
-        publicKeyToUse,
+        ephemeralPublicKey,
         privateKey
       );
+
+      console.log('✅ Message decrypted successfully:', {
+        messageId: message.id,
+        decryptedLength: decryptedContent?.length
+      });
+
+      return decryptedContent;
     } catch (error) {
-      console.error('Error decrypting message:', error);
+      console.error('❌ Error decrypting message:', {
+        messageId: message.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       return '[Encrypted Message - Decryption Failed]';
     }
-  }, [getPrivateKey, user?.id, currentChatPeerPublicKey]);
+  }, [getPrivateKey]);
 
   // Delete a message
   const removeMessage = useCallback(async (messageId: string) => {
@@ -233,7 +280,7 @@ export const useEncryptedMessages = () => {
   const getDecryptedMessages = useCallback(() => {
     return messages.map(message => ({
       ...message,
-      id: (message as any).id || (message as any)._id,
+      id: message.id || message._id,
       decryptedContent: decryptForDisplay(message)
     }));
   }, [messages, decryptForDisplay]);

@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const messageController = require('../controllers/messageController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
 
 // Apply authentication middleware to all message routes
-router.use(authMiddleware.protect);
+router.use(protect);
 
 // Send an encrypted message
 router.post('/', messageController.sendMessage);

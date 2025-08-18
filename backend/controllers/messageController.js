@@ -9,13 +9,13 @@ const UserKey = require('../models/UserKey');
  */
 exports.sendMessage = async (req, res) => {
   try {
-    const { chatId, receiverId, encryptedContent, nonce, messageType = 'text', metadata = {} } = req.body;
+    const { chatId, receiverId, encryptedContent, nonce, ephemeralPublicKey, messageType = 'text', metadata = {} } = req.body;
     const senderId = req.user.id; // From JWT token
 
     // Validate required fields
-    if (!chatId || !receiverId || !encryptedContent || !nonce) {
+    if (!chatId || !receiverId || !encryptedContent || !nonce || !ephemeralPublicKey) {
       return res.status(400).json({
-        message: 'Missing required fields: chatId, receiverId, encryptedContent, nonce'
+        message: 'Missing required fields: chatId, receiverId, encryptedContent, nonce, ephemeralPublicKey'
       });
     }
 
@@ -49,6 +49,7 @@ exports.sendMessage = async (req, res) => {
       receiverId,
       encryptedContent,
       nonce,
+      ephemeralPublicKey,
       senderPublicKey: senderKey.publicKey,
       messageType,
       metadata
@@ -71,6 +72,7 @@ exports.sendMessage = async (req, res) => {
         receiverId: message.receiverId,
         encryptedContent: message.encryptedContent,
         nonce: message.nonce,
+        ephemeralPublicKey: message.ephemeralPublicKey,
         senderPublicKey: message.senderPublicKey,
         messageType: message.messageType,
         metadata: message.metadata,

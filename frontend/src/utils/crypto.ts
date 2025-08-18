@@ -219,17 +219,22 @@ export const initializeUserKeys = async (userId: string): Promise<boolean> => {
 
 /**
  * Encrypt a message using the recipient's public key and sender's private key
+ * This implements proper end-to-end encryption using ephemeral keys
  */
 export const encryptMessage = (message: string, recipientPublicKey: string, senderPrivateKey: string): string => {
   try {
+    // Generate an ephemeral key pair for this message
     const ephemeralKeyPair = nacl.box.keyPair();
+    
+    // Generate a random nonce for this encryption
     const nonce = nacl.randomBytes(24);
 
+    // Encrypt the message using the recipient's public key and ephemeral private key
     const encrypted = nacl.box(
       decodeUTF8(message),
       nonce,
       decodeBase64(recipientPublicKey),
-      decodeBase64(senderPrivateKey)
+      ephemeralKeyPair.secretKey
     );
 
     const encryptedData = {
@@ -246,21 +251,26 @@ export const encryptMessage = (message: string, recipientPublicKey: string, send
 };
 
 /**
- * Decrypt a message using the recipient's private key and sender's public key
+ * Decrypt a message using the recipient's private key and ephemeral public key
+ * This implements proper end-to-end decryption
  */
-export const decryptMessage = (encryptedData: string, senderPublicKey: string, recipientPrivateKey: string): string => {
+export const decryptMessage = (encryptedData: string, ephemeralPublicKey: string, recipientPrivateKey: string): string => {
   try {
     const data = JSON.parse(encryptedData);
 
+    // Use the ephemeral public key from the data if provided, otherwise use the parameter
+    const keyToUse = data.ephemeralPublicKey || ephemeralPublicKey;
+
+    // Decrypt the message using the ephemeral public key and recipient's private key
     const decrypted = nacl.box.open(
       decodeBase64(data.encrypted),
       decodeBase64(data.nonce),
-      decodeBase64(senderPublicKey),
+      decodeBase64(keyToUse),
       decodeBase64(recipientPrivateKey)
     );
 
     if (!decrypted) {
-      throw new Error('Failed to decrypt message');
+      throw new Error('Failed to decrypt message - invalid keys or corrupted data');
     }
 
     return encodeUTF8(decrypted);
@@ -269,3 +279,58 @@ export const decryptMessage = (encryptedData: string, senderPublicKey: string, r
     throw new Error('Failed to decrypt message');
   }
 };
+
+/**
+ * Test function to verify encryption/decryption is working
+ */
+export const testEncryptionDecryption = (): boolean => {
+  try {
+    // Generate test keys
+    const aliceKeyPair = generateKeyPair();
+    const bobKeyPair = generateKeyPair();
+    
+    // Test message
+    const testMessage = "Hello, this is a test message!";
+    
+    // Alice encrypts a message for Bob
+    const encryptedData = encryptMessage(testMessage, bobKeyPair.publicKey, aliceKeyPair.privateKey);
+    const parsedData = JSON.parse(encryptedData);
+    
+    // Bob decrypts the message
+    const decryptedMessage = decryptMessage(encryptedData, '', bobKeyPair.privateKey);
+    
+    // Verify the decrypted message matches the original
+    if (decryptedMessage === testMessage) {
+      console.log('✅ Encryption/Decryption test passed!');
+      return true;
+    } else {
+      console.error('❌ Encryption/Decryption test failed!');
+      console.error('Original:', testMessage);
+      console.error('Decrypted:', decryptedMessage);
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Encryption/Decryption test error:', error);
+    return false;
+  }
+};
+
+/**
+ * Simple test function that can be called from browser console
+ * Usage: window.testCrypto()
+ */
+export const testCrypto = () => {
+  console.log('🧪 Testing crypto functionality...');
+  const result = testEncryptionDecryption();
+  if (result) {
+    console.log('✅ Crypto test passed! Encryption/decryption is working correctly.');
+  } else {
+    console.log('❌ Crypto test failed! Check the console for details.');
+  }
+  return result;
+};
+
+// Make it available globally for testing
+if (typeof window !== 'undefined') {
+  (window as any).testCrypto = testCrypto;
+}

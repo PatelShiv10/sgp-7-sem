@@ -62,7 +62,7 @@ const Login = () => {
           firstName: data.user.firstName,
           lastName: data.user.lastName,
           email: data.user.email,
-          userType: data.user.role as 'user' | 'lawyer' | 'admin',
+          role: data.user.role as 'user' | 'lawyer' | 'admin',
           id: data.user.id
         };
 

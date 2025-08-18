@@ -24,6 +24,10 @@ const messageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  ephemeralPublicKey: {
+    type: String,
+    required: true
+  },
   senderPublicKey: {
     type: String,
     required: true

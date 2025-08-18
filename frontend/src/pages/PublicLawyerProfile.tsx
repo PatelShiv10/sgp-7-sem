@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Star, Phone, MessageCircle, Calendar, Clock, DollarSign, Award, Users, CheckCircle, Shield, Loader2 } from 'lucide-react';
+import PaymentModal from '@/components/PaymentModal';
 
 interface PublicLawyer {
   _id: string;
@@ -24,6 +25,7 @@ const PublicLawyerProfile = () => {
   const [lawyer, setLawyer] = useState<PublicLawyer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
     const fetchLawyer = async () => {
@@ -67,6 +69,10 @@ const PublicLawyerProfile = () => {
   }
 
   const fullName = `${lawyer.firstName} ${lawyer.lastName}`;
+
+  const handlePaymentClick = () => {
+    setShowPaymentModal(true);
+  };
 
   return (
     <div className="min-h-screen py-16 bg-gray-50">
@@ -142,6 +148,14 @@ const PublicLawyerProfile = () => {
                   <MessageCircle className="h-4 w-4 mr-2" />
                   Send Message
                 </Link>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                onClick={handlePaymentClick}
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                Pay Lawyer
               </Button>
               <Button variant="outline" className="border-gray-300">
                 <Phone className="h-4 w-4 mr-2" />
@@ -253,6 +267,20 @@ const PublicLawyerProfile = () => {
           </div>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      {lawyer && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          lawyerId={lawyer._id}
+          lawyerName={fullName}
+          amount={1500}
+          onSuccess={() => {
+            setShowPaymentModal(false);
+          }}
+        />
+      )}
     </div>
   );
 };

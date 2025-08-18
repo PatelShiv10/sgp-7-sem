@@ -193,6 +193,58 @@ exports.getLawyerAppointments = async (req, res) => {
   }
 };
 
+// Get all appointments for the current user
+exports.getUserAppointments = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { status, page = 1, limit = 20 } = req.query;
+
+    // Build query
+    const query = { clientId: userId };
+    if (status) {
+      query.status = status;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [appointments, total] = await Promise.all([
+      Appointment.find(query)
+        .populate('lawyerId', 'firstName lastName email specialization')
+        .populate('clientId', 'firstName lastName email')
+        .sort({ startsAt: 1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Appointment.countDocuments(query)
+    ]);
+
+    const totalPages = Math.ceil(total / parseInt(limit));
+
+    res.json({
+      success: true,
+      message: 'User appointments retrieved successfully',
+      data: {
+        appointments,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages,
+          totalItems: total,
+          hasNextPage: parseInt(page) < totalPages,
+          hasPrevPage: parseInt(page) > 1,
+          limit: parseInt(limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching user appointments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch appointments',
+      error: error.message
+    });
+  }
+};
+
 // Get all appointments for a client (user)
 exports.getClientAppointments = async (req, res) => {
   try {

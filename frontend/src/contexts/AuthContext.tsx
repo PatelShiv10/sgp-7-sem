@@ -5,7 +5,7 @@ interface User {
   firstName: string;
   lastName: string;
   email: string;
-  userType: 'user' | 'lawyer' | 'admin';
+  role: 'user' | 'lawyer' | 'admin';
   id: string;
 }
 
@@ -25,17 +25,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const storedUser = localStorage.getItem('currentUser');
     const token = localStorage.getItem('token');
     
+    console.log('🔐 AuthContext: Checking localStorage...');
+    console.log('🔐 AuthContext: storedUser:', storedUser);
+    console.log('🔐 AuthContext: token:', token ? 'exists' : 'missing');
+    
     if (storedUser && token) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        console.log('🔐 AuthContext: Parsed user data:', parsedUser);
+        console.log('🔐 AuthContext: User has role field?', 'role' in parsedUser);
+        console.log('🔐 AuthContext: User has userType field?', 'userType' in parsedUser);
+        
+        // Handle legacy userType field
+        if (parsedUser.userType && !parsedUser.role) {
+          console.log('🔐 AuthContext: Converting userType to role');
+          parsedUser.role = parsedUser.userType;
+          delete parsedUser.userType;
+          localStorage.setItem('currentUser', JSON.stringify(parsedUser));
+        }
+        
+        setUser(parsedUser);
+      } catch (error) {
+        console.error('🔐 AuthContext: Error parsing stored user:', error);
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('token');
+      }
+    } else {
+      console.log('🔐 AuthContext: No stored user or token found');
     }
   }, []);
 
   const login = (userData: User) => {
+    console.log('🔐 AuthContext: Logging in user:', userData);
     setUser(userData);
     localStorage.setItem('currentUser', JSON.stringify(userData));
   };
 
   const logout = () => {
+    console.log('🔐 AuthContext: Logging out user');
     setUser(null);
     localStorage.removeItem('currentUser');
     localStorage.removeItem('token');

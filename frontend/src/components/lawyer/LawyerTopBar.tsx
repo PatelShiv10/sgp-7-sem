@@ -35,7 +35,7 @@ export const LawyerTopBar = () => {
   }, []);
 
   useEffect(() => {
-    if (!user || user.userType !== 'lawyer') return;
+    if (!user || user.role !== 'lawyer') return;
     pollNotifications();
     const id = setInterval(pollNotifications, 15000);
     return () => clearInterval(id);

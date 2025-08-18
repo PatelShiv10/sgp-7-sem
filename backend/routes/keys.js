@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const keyController = require('../controllers/keyController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const { protect } = require('../middlewares/authMiddleware');
 
 // Apply authentication middleware to all key routes
-router.use(authMiddleware.protect);
+router.use(protect);
 
 // Store a user's public key
 router.post('/', keyController.storePublicKey);

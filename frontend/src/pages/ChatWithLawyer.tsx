@@ -4,9 +4,16 @@ import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Send, ArrowLeft, Phone, Video } from 'lucide-react';
+import { Send, ArrowLeft, Phone, Video, Bug, Key, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEncryptedMessages } from '@/hooks/useEncryptedMessages';
+import { testEncryptionDecryption } from '@/utils/crypto';
+import { 
+  initializeCryptoKeys, 
+  regenerateCryptoKeys, 
+  validateCryptoKeys, 
+  getCryptoKeyInfo 
+} from '@/utils/cryptoKeyManager';
 
 const ChatWithLawyer = () => {
   const { lawyerId } = useParams();
@@ -43,7 +50,11 @@ const ChatWithLawyer = () => {
       await sendMessage(text, lawyerId);
       const chatId = generateChatId(userId, lawyerId);
       await loadChatMessages(chatId);
-    } catch {}
+    } catch (error) {
+      // Restore the input text if sending failed
+      setInputText(text);
+      console.error('Failed to send message:', error);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -51,6 +62,93 @@ const ChatWithLawyer = () => {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const handleDebugTest = () => {
+    console.log('🧪 Running encryption/decryption test...');
+    const testResult = testEncryptionDecryption();
+    if (testResult) {
+      alert('✅ Encryption/Decryption test passed! The crypto system is working correctly.');
+    } else {
+      alert('❌ Encryption/Decryption test failed! Check console for details.');
+    }
+  };
+
+  const handleRegenerateKeys = async () => {
+    if (!user?.id) {
+      alert('❌ User not authenticated. Please log in first.');
+      return;
+    }
+    
+    try {
+      console.log('🔑 Regenerating crypto keys...');
+      const success = await regenerateCryptoKeys(user.id);
+      if (success) {
+        alert('✅ Crypto keys regenerated successfully! Please refresh the page.');
+        window.location.reload();
+      } else {
+        alert('❌ Failed to regenerate crypto keys. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error regenerating keys:', error);
+      alert('❌ Error regenerating crypto keys. Please try again.');
+    }
+  };
+
+  const handleInitializeKeys = async () => {
+    if (!user?.id) {
+      alert('❌ User not authenticated. Please log in first.');
+      return;
+    }
+    
+    try {
+      console.log('🔑 Initializing crypto keys...');
+      const success = await initializeCryptoKeys(user.id);
+      if (success) {
+        alert('✅ Crypto keys initialized successfully! Please refresh the page.');
+        window.location.reload();
+      } else {
+        alert('❌ Failed to initialize crypto keys. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error initializing keys:', error);
+      alert('❌ Error initializing crypto keys. Please try again.');
+    }
+  };
+
+  const handleValidateKeys = async () => {
+    if (!user?.id) {
+      alert('❌ User not authenticated. Please log in first.');
+      return;
+    }
+    
+    try {
+      console.log('🔍 Validating crypto keys...');
+      const validation = await validateCryptoKeys(user.id);
+      if (validation.isValid) {
+        alert('✅ Crypto keys are valid and working correctly!');
+      } else {
+        alert(`❌ Crypto keys validation failed: ${validation.error}`);
+      }
+    } catch (error) {
+      console.error('Error validating keys:', error);
+      alert('❌ Error validating crypto keys. Please try again.');
+    }
+  };
+
+  const handleShowKeyInfo = () => {
+    if (!user?.id) {
+      alert('❌ User not authenticated. Please log in first.');
+      return;
+    }
+    
+    const keyInfo = getCryptoKeyInfo(user.id);
+    console.log('🔑 Crypto Key Information:', keyInfo);
+    alert(`🔑 Crypto Key Status:\n\n` +
+          `Has Private Key: ${keyInfo.hasPrivateKey ? '✅ Yes' : '❌ No'}\n` +
+          `Private Key Length: ${keyInfo.privateKeyLength}\n` +
+          `Is Initialized: ${keyInfo.status.isInitialized ? '✅ Yes' : '❌ No'}\n\n` +
+          `Check console for detailed information.`);
   };
 
   const lawyer = {
@@ -88,6 +186,26 @@ const ChatWithLawyer = () => {
           </div>
           
           <div className="flex space-x-2">
+            <Button variant="outline" size="sm" onClick={handleDebugTest}>
+              <Bug className="h-4 w-4 mr-2" />
+              Debug Crypto
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRegenerateKeys}>
+              <Key className="h-4 w-4 mr-2" />
+              Regenerate Keys
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleInitializeKeys}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Initialize Keys
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleValidateKeys}>
+              <Key className="h-4 w-4 mr-2" />
+              Validate Keys
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleShowKeyInfo}>
+              <Key className="h-4 w-4 mr-2" />
+              Show Key Info
+            </Button>
             <Button variant="outline" size="sm">
               <Phone className="h-4 w-4 mr-2" />
               Call
@@ -110,8 +228,28 @@ const ChatWithLawyer = () => {
             <Card className="flex-1 shadow-soft border-0 flex flex-col">
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {/* Decryption Error Warning */}
+                {decryptedMessages.some(msg => (msg as any).decryptedContent?.includes('[Encrypted Message -')) && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                    <div className="flex items-center">
+                      <span className="text-yellow-600 mr-2">⚠️</span>
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800">
+                          Some messages could not be decrypted
+                        </p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          This may happen if crypto keys are missing or corrupted. Try refreshing the page or regenerating your crypto keys.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 {decryptedMessages.map((message) => {
                   const isOwn = message.senderId._id === userId;
+                  const decryptedContent = (message as any).decryptedContent;
+                  const isDecryptionError = decryptedContent && decryptedContent.includes('[Encrypted Message -');
+                  
                   return (
                     <div
                       key={message.id}
@@ -120,8 +258,17 @@ const ChatWithLawyer = () => {
                       <div className={`max-w-[70%] ${isOwn ? 'order-2' : 'order-1'}`}>
                         <div className={`p-4 rounded-lg ${
                           isOwn ? 'bg-teal text-white' : 'bg-gray-100'
-                        }`}>
-                          <p className="leading-relaxed">{(message as any).decryptedContent}</p>
+                        } ${isDecryptionError ? 'border-2 border-red-300 bg-red-50' : ''}`}>
+                          <p className={`leading-relaxed ${isDecryptionError ? 'text-red-600 font-medium' : ''}`}>
+                            {isDecryptionError ? (
+                              <span className="flex items-center">
+                                <span className="mr-2">🔒</span>
+                                {decryptedContent}
+                              </span>
+                            ) : (
+                              decryptedContent
+                            )}
+                          </p>
                         </div>
                         <div className={`text-xs text-gray-500 mt-1 ${
                           isOwn ? 'text-right' : 'text-left'

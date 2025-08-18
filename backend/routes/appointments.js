@@ -4,6 +4,7 @@ const {
   createAppointment,
   getLawyerAppointments,
   getClientAppointments,
+  getUserAppointments,
   getAppointmentById,
   updateAppointmentStatus,
   deleteAppointment
@@ -15,6 +16,9 @@ router.post('/', protect, createAppointment);
 
 // Get all appointments for a lawyer
 router.get('/lawyer/:lawyerId', protect, getLawyerAppointments);
+
+// Get all appointments for the current user
+router.get('/user', protect, getUserAppointments);
 
 // Get all appointments for a client (user)
 router.get('/client/:clientId', protect, getClientAppointments);
