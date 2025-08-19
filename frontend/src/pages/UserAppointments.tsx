@@ -117,8 +117,10 @@ const UserAppointments: React.FC = () => {
     setSelectedAppointment(null);
     toast({
       title: "Success",
-      description: "Review submitted successfully!",
+      description: "Review submitted successfully! Your review will be visible to the lawyer.",
     });
+    // Optionally reload appointments to reflect any changes
+    loadAppointments();
   };
 
   const handlePaymentClick = (lawyerId: string, lawyerName: string) => {

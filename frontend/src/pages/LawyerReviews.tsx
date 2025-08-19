@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Star, MessageCircle } from 'lucide-react';
+import { Star, MessageCircle, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 
 interface Review {
@@ -44,6 +44,7 @@ const LawyerReviews: React.FC = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<ReviewStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [lastReviewCount, setLastReviewCount] = useState(0);
 
   useEffect(() => {
     if (user?.id) {
@@ -52,15 +53,38 @@ const LawyerReviews: React.FC = () => {
     }
   }, [user?.id]);
 
+  // Auto-refresh reviews every 30 seconds
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const interval = setInterval(() => {
+      loadReviews();
+      loadReviewStats();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
   const loadReviews = async () => {
     try {
       setIsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:5000/api/reviews?page=1&limit=10`, {
+      const response = await axios.get(`http://localhost:5000/api/reviews/lawyer/${user?.id}?page=1&limit=10`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setReviews(response.data.data.reviews);
+      const newReviews = response.data.data.reviews;
+      setReviews(newReviews);
+      
+      // Check if there are new reviews
+      if (lastReviewCount > 0 && newReviews.length > lastReviewCount) {
+        const newCount = newReviews.length - lastReviewCount;
+        toast({
+          title: "New Reviews",
+          description: `You have ${newCount} new review${newCount > 1 ? 's' : ''}!`,
+        });
+      }
+      setLastReviewCount(newReviews.length);
     } catch (error) {
       toast({
         title: "Error",
@@ -112,7 +136,27 @@ const LawyerReviews: React.FC = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Client Reviews</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold">Client Reviews</h1>
+          {stats && stats.totalReviews > 0 && (
+            <Badge variant="secondary" className="text-sm">
+              {stats.totalReviews} review{stats.totalReviews !== 1 ? 's' : ''}
+            </Badge>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            loadReviews();
+            loadReviewStats();
+          }}
+          disabled={isLoading}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Review Statistics */}
@@ -151,6 +195,18 @@ const LawyerReviews: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+          {reviews.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Latest Review</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm text-gray-600">
+                  {formatDate(reviews[0].createdAt)}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -176,19 +232,26 @@ const LawyerReviews: React.FC = () => {
               {reviews.map((review) => (
                 <div key={review._id} className="border rounded-lg p-4">
                   <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 font-semibold">
-                          {review.userId.firstName.charAt(0)}{review.userId.lastName.charAt(0)}
-                        </span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold">
-                          {review.userId.firstName} {review.userId.lastName}
-                        </h3>
+                                      <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-blue-600 font-semibold">
+                        {review.userId.firstName.charAt(0)}{review.userId.lastName.charAt(0)}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">
+                        {review.userId.firstName} {review.userId.lastName}
+                      </h3>
+                      <div className="flex items-center gap-2">
                         <p className="text-sm text-gray-500">{formatDate(review.createdAt)}</p>
+                        {new Date(review.createdAt) > new Date(Date.now() - 24 * 60 * 60 * 1000) && (
+                          <Badge variant="default" className="text-xs bg-green-500">
+                            NEW
+                          </Badge>
+                        )}
                       </div>
                     </div>
+                  </div>
                     <div className="flex items-center gap-2">
                       <div className="flex">
                         {renderStars(review.rating)}
