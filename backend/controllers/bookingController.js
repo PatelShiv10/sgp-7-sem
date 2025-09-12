@@ -1,6 +1,6 @@
 const User = require('../models/User');
 const Booking = require('../models/Booking');
-const Appointment = require('../models/Appointment');
+const LawyerClient = require('../models/LawyerClient');
 
 function toMinutes(hhmm) {
   const [h, m] = hhmm.split(':').map(Number);
@@ -62,7 +62,11 @@ exports.getExpandedSlots = async (req, res) => {
 
       if (slots.length > 0) {
         // Exclude already booked slots
-        const bookings = await Booking.find({ lawyerId, date: dateStr, status: 'confirmed' }).select('start');
+        const bookings = await Booking.find({ 
+          lawyerId, 
+          date: dateStr, 
+          status: { $in: ['pending', 'confirmed'] } 
+        }).select('start');
         const bookedSet = new Set(bookings.map(b => b.start));
         slots = slots.filter(s => !bookedSet.has(s));
       }
@@ -79,7 +83,7 @@ exports.getExpandedSlots = async (req, res) => {
 
 exports.createBooking = async (req, res) => {
   try {
-    const { lawyerId, date, start, durationMins = 30, notes } = req.body;
+    const { lawyerId, date, start, durationMins = 30 } = req.body;
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
     if (!lawyerId || !date || !start) {
@@ -98,36 +102,33 @@ exports.createBooking = async (req, res) => {
     const dayName = dayNames[d.getDay()];
     const daySchedule = (lawyer.availability || []).find(x => x.day === dayName);
     const validSlots = new Set(expandDaySlots(daySchedule, 30));
-    // If availability exists for the day, enforce slot validation.
-    // If no availability configured, allow booking any provided time for flexibility.
-    if (validSlots.size > 0 && !validSlots.has(start)) {
+    if (!validSlots.has(start)) {
       return res.status(400).json({ success: false, message: 'Selected time is not available' });
     }
 
+    // Calculate end time based on start and duration
+    const [startHours, startMins] = start.split(':').map(Number);
+    const startTotal = startHours * 60 + startMins;
+    const endTotal = startTotal + durationMins;
+    const endHours = Math.floor(endTotal / 60);
+    const endMins = endTotal % 60;
+    const end = `${endHours.toString().padStart(2, '0')}:${endMins.toString().padStart(2, '0')}`;
+
     // Try to create booking (unique index prevents double-booking)
-    const booking = await Booking.create({ lawyerId, userId, date, start, durationMins, status: 'confirmed' });
+    const booking = await Booking.create({ 
+      lawyerId, 
+      userId, 
+      date, 
+      start, 
+      end, // Explicitly set the calculated end time
+      durationMins, 
+      status: 'pending',
+      appointmentType: req.body.appointmentType || 'consultation',
+      meetingType: req.body.meetingType || 'video_call',
+      clientNotes: req.body.notes || ''
+    });
 
-    // Also create an Appointment record so it appears in lawyer's dashboard
-    try {
-      const startsAt = new Date(`${date}T${start}:00`);
-      const endsAt = new Date(startsAt.getTime() + durationMins * 60000);
-
-      const appointment = new Appointment({
-        lawyerId,
-        clientId: userId,
-        startsAt,
-        endsAt,
-        status: 'confirmed',
-        notes: notes || '',
-        meetingType: 'video-call',
-        location: '',
-        meetingLink: ''
-      });
-      await appointment.save();
-    } catch (e) {
-      // Log but don't fail booking
-      console.warn('Failed to create mirrored appointment from booking:', e);
-    }
+    // Client-lawyer relationship removed; no side-effects
 
     res.status(201).json({ success: true, message: 'Booking confirmed', data: booking });
   } catch (error) {

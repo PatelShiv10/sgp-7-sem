@@ -1,59 +1,86 @@
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Send, ArrowLeft, Phone, Video, Bug, Key, RefreshCw } from 'lucide-react';
+import { Send, ArrowLeft, Phone, Video, Trash2, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEncryptedMessages } from '@/hooks/useEncryptedMessages';
-import { testEncryptionDecryption } from '@/utils/crypto';
-import { 
-  initializeCryptoKeys, 
-  regenerateCryptoKeys, 
-  validateCryptoKeys, 
-  getCryptoKeyInfo 
-} from '@/utils/cryptoKeyManager';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+
+interface Message {
+  _id: string;
+  text: string;
+  sender: 'user' | 'lawyer';
+  createdAt: string;
+}
 
 const ChatWithLawyer = () => {
   const { lawyerId } = useParams();
   const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
-  const endRef = useRef<HTMLDivElement | null>(null);
-  const {
-    loadChatMessages,
-    sendMessage,
-    getDecryptedMessages,
-    generateChatId,
-  } = useEncryptedMessages();
-  const decryptedMessages = getDecryptedMessages();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  // Remove auto-scroll behavior
+  const [messageDeleteDialogOpen, setMessageDeleteDialogOpen] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
+  const [deletingMessage, setDeletingMessage] = useState(false);
 
   const userId = user?.id;
 
-  const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  useEffect(scrollToBottom, [decryptedMessages.length]);
+  // No auto-scroll on mount or on message updates
 
   useEffect(() => {
-    const init = async () => {
-      if (!lawyerId || !userId) return;
-      const chatId = generateChatId(userId, lawyerId);
-      await loadChatMessages(chatId);
+    const fetchConversation = async () => {
+      try {
+        if (!lawyerId || !userId) return;
+        setLoading(true);
+        setError(null);
+        const token = localStorage.getItem('token');
+        const params = new URLSearchParams({ lawyerId, userId });
+        const res = await fetch(`http://localhost:5000/api/chat/conversation?${params.toString()}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load messages');
+        const data = await res.json();
+        setMessages(data.data);
+      } catch (e) {
+        setError('Failed to load conversation');
+      } finally {
+        setLoading(false);
+      }
     };
-    init();
-  }, [lawyerId, userId, loadChatMessages, generateChatId]);
+    fetchConversation();
+  }, [lawyerId, userId]);
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !lawyerId || !userId) return;
-    const text = inputText;
+    const optimistic: Message = {
+      _id: 'temp-' + Date.now(),
+      text: inputText,
+      sender: 'user',
+      createdAt: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, optimistic]);
     setInputText('');
+
     try {
-      await sendMessage(text, lawyerId);
-      const chatId = generateChatId(userId, lawyerId);
-      await loadChatMessages(chatId);
-    } catch (error) {
-      // Restore the input text if sending failed
-      setInputText(text);
-      console.error('Failed to send message:', error);
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/chat/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ lawyerId, userId, text: optimistic.text })
+      });
+      if (!res.ok) throw new Error('Failed to send');
+      const { data } = await res.json();
+      setMessages(prev => prev.map(m => m._id === optimistic._id ? data : m));
+    } catch (e) {
+      setMessages(prev => prev.filter(m => m._id !== optimistic._id));
+      alert('Failed to send message');
     }
   };
 
@@ -63,92 +90,70 @@ const ChatWithLawyer = () => {
       handleSendMessage();
     }
   };
-
-  const handleDebugTest = () => {
-    console.log('🧪 Running encryption/decryption test...');
-    const testResult = testEncryptionDecryption();
-    if (testResult) {
-      alert('✅ Encryption/Decryption test passed! The crypto system is working correctly.');
-    } else {
-      alert('❌ Encryption/Decryption test failed! Check console for details.');
-    }
-  };
-
-  const handleRegenerateKeys = async () => {
-    if (!user?.id) {
-      alert('❌ User not authenticated. Please log in first.');
-      return;
-    }
+  
+  const handleDeleteMessage = async () => {
+    if (!messageToDelete) return;
     
     try {
-      console.log('🔑 Regenerating crypto keys...');
-      const success = await regenerateCryptoKeys(user.id);
-      if (success) {
-        alert('✅ Crypto keys regenerated successfully! Please refresh the page.');
-        window.location.reload();
+      setDeletingMessage(true);
+      const token = localStorage.getItem('token');
+      
+      // Log the request details for debugging
+      console.log(`Deleting message with ID: ${messageToDelete._id}`);
+      
+      // Make the DELETE request
+      const response = await fetch(`http://localhost:5000/api/chat/message/${messageToDelete._id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // No Content-Type header for DELETE requests as they typically don't have a body
+        },
+      });
+      
+      // Log response details for debugging
+      console.log('Delete response status:', response.status);
+      
+      // Get the response text first
+      const responseText = await response.text();
+      console.log('Raw response text:', responseText);
+      
+      // Try to parse the response as JSON
+      let responseData;
+      try {
+        responseData = responseText ? JSON.parse(responseText) : {};
+      } catch (parseError) {
+        console.error('Could not parse response as JSON:', parseError);
+        responseData = { 
+          success: false,
+          message: 'Server returned non-JSON response' 
+        };
+      }
+      
+      console.log('Delete response data:', responseData);
+      
+      if (response.ok && responseData.success) {
+        // Success - remove the message from state
+        setMessages(messages.filter(msg => msg._id !== messageToDelete._id));
+        setMessageDeleteDialogOpen(false);
+        console.log('Message deleted successfully');
       } else {
-        alert('❌ Failed to regenerate crypto keys. Please try again.');
+        // Error
+        const errorMessage = responseData.message || 'Unknown error';
+        console.error(`Error deleting message (${response.status}):`, errorMessage);
+        alert(`Failed to delete message: ${errorMessage}`);
       }
     } catch (error) {
-      console.error('Error regenerating keys:', error);
-      alert('❌ Error regenerating crypto keys. Please try again.');
+      console.error('Error in delete operation:', error);
+      alert(`Error deleting message: ${error.message}`);
+    } finally {
+      setDeletingMessage(false);
+      setMessageToDelete(null);
     }
   };
-
-  const handleInitializeKeys = async () => {
-    if (!user?.id) {
-      alert('❌ User not authenticated. Please log in first.');
-      return;
-    }
-    
-    try {
-      console.log('🔑 Initializing crypto keys...');
-      const success = await initializeCryptoKeys(user.id);
-      if (success) {
-        alert('✅ Crypto keys initialized successfully! Please refresh the page.');
-        window.location.reload();
-      } else {
-        alert('❌ Failed to initialize crypto keys. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error initializing keys:', error);
-      alert('❌ Error initializing crypto keys. Please try again.');
-    }
-  };
-
-  const handleValidateKeys = async () => {
-    if (!user?.id) {
-      alert('❌ User not authenticated. Please log in first.');
-      return;
-    }
-    
-    try {
-      console.log('🔍 Validating crypto keys...');
-      const validation = await validateCryptoKeys(user.id);
-      if (validation.isValid) {
-        alert('✅ Crypto keys are valid and working correctly!');
-      } else {
-        alert(`❌ Crypto keys validation failed: ${validation.error}`);
-      }
-    } catch (error) {
-      console.error('Error validating keys:', error);
-      alert('❌ Error validating crypto keys. Please try again.');
-    }
-  };
-
-  const handleShowKeyInfo = () => {
-    if (!user?.id) {
-      alert('❌ User not authenticated. Please log in first.');
-      return;
-    }
-    
-    const keyInfo = getCryptoKeyInfo(user.id);
-    console.log('🔑 Crypto Key Information:', keyInfo);
-    alert(`🔑 Crypto Key Status:\n\n` +
-          `Has Private Key: ${keyInfo.hasPrivateKey ? '✅ Yes' : '❌ No'}\n` +
-          `Private Key Length: ${keyInfo.privateKeyLength}\n` +
-          `Is Initialized: ${keyInfo.status.isInitialized ? '✅ Yes' : '❌ No'}\n\n` +
-          `Check console for detailed information.`);
+  
+  const openDeleteDialog = (message: Message) => {
+    setMessageToDelete(message);
+    setMessageDeleteDialogOpen(true);
   };
 
   const lawyer = {
@@ -186,26 +191,6 @@ const ChatWithLawyer = () => {
           </div>
           
           <div className="flex space-x-2">
-            <Button variant="outline" size="sm" onClick={handleDebugTest}>
-              <Bug className="h-4 w-4 mr-2" />
-              Debug Crypto
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleRegenerateKeys}>
-              <Key className="h-4 w-4 mr-2" />
-              Regenerate Keys
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleInitializeKeys}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Initialize Keys
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleValidateKeys}>
-              <Key className="h-4 w-4 mr-2" />
-              Validate Keys
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleShowKeyInfo}>
-              <Key className="h-4 w-4 mr-2" />
-              Show Key Info
-            </Button>
             <Button variant="outline" size="sm">
               <Phone className="h-4 w-4 mr-2" />
               Call
@@ -217,69 +202,49 @@ const ChatWithLawyer = () => {
               </Link>
             </Button>
             <Button asChild size="sm" className="bg-teal hover:bg-teal-light text-white">
-              <Link to={`/booking-new/${lawyerId}`}>Book Consultation</Link>
+              <Link to={`/booking/${lawyerId}`}>Book Consultation</Link>
             </Button>
           </div>
         </div>
 
         <div className="flex flex-1 gap-4 min-h-0">
           {/* Chat Area */}
-          <div className="flex-1 flex flex-col">
-            <Card className="flex-1 shadow-soft border-0 flex flex-col">
+          <div className="flex-1 flex flex-col min-h-0">
+            <Card className="shadow-soft border-0 flex flex-col h-[70vh]">
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {/* Decryption Error Warning */}
-                {decryptedMessages.some(msg => (msg as any).decryptedContent?.includes('[Encrypted Message -')) && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                    <div className="flex items-center">
-                      <span className="text-yellow-600 mr-2">⚠️</span>
-                      <div>
-                        <p className="text-sm font-medium text-yellow-800">
-                          Some messages could not be decrypted
-                        </p>
-                        <p className="text-xs text-yellow-700 mt-1">
-                          This may happen if crypto keys are missing or corrupted. Try refreshing the page or regenerating your crypto keys.
-                        </p>
+              <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+                {loading && <div className="text-center text-gray-500">Loading...</div>}
+                {error && <div className="text-center text-red-600">{error}</div>}
+                {messages.map((message) => (
+                  <div
+                    key={message._id}
+                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[70%] ${message.sender === 'user' ? 'order-2' : 'order-1'} relative group`}>
+                      <div className={`p-4 rounded-lg ${
+                        message.sender === 'user' 
+                          ? 'bg-teal text-white' 
+                          : 'bg-gray-100'
+                      }`}>
+                        <p className="leading-relaxed">{message.text}</p>
+                      </div>
+                      <div className={`text-xs text-gray-500 mt-1 flex items-center ${
+                        message.sender === 'user' ? 'justify-end' : 'justify-start'
+                      }`}>
+                        <span>{new Date(message.createdAt).toLocaleTimeString()}</span>
+                        {message.sender === 'user' && (
+                          <button 
+                            onClick={() => openDeleteDialog(message)}
+                            className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Delete message"
+                          >
+                            <Trash2 className="h-3 w-3 text-gray-400 hover:text-red-500" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
-                )}
-                
-                {decryptedMessages.map((message) => {
-                  const isOwn = message.senderId._id === userId;
-                  const decryptedContent = (message as any).decryptedContent;
-                  const isDecryptionError = decryptedContent && decryptedContent.includes('[Encrypted Message -');
-                  
-                  return (
-                    <div
-                      key={message.id}
-                      className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`max-w-[70%] ${isOwn ? 'order-2' : 'order-1'}`}>
-                        <div className={`p-4 rounded-lg ${
-                          isOwn ? 'bg-teal text-white' : 'bg-gray-100'
-                        } ${isDecryptionError ? 'border-2 border-red-300 bg-red-50' : ''}`}>
-                          <p className={`leading-relaxed ${isDecryptionError ? 'text-red-600 font-medium' : ''}`}>
-                            {isDecryptionError ? (
-                              <span className="flex items-center">
-                                <span className="mr-2">🔒</span>
-                                {decryptedContent}
-                              </span>
-                            ) : (
-                              decryptedContent
-                            )}
-                          </p>
-                        </div>
-                        <div className={`text-xs text-gray-500 mt-1 ${
-                          isOwn ? 'text-right' : 'text-left'
-                        }`}>
-                          {new Date(message.createdAt).toLocaleTimeString()}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={endRef} />
+                ))}
               </div>
 
               {/* Input Area */}
@@ -348,6 +313,39 @@ const ChatWithLawyer = () => {
           </div>
         </div>
       </div>
+      
+      {/* Delete Message Dialog */}
+      <Dialog open={messageDeleteDialogOpen} onOpenChange={setMessageDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Message</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p>Are you sure you want to delete this message? This action cannot be undone.</p>
+            {messageToDelete && (
+              <div className="mt-2 p-3 bg-gray-100 rounded-md">
+                <p className="text-sm text-gray-800">{messageToDelete.text}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex space-x-2 justify-end">
+            <Button 
+              variant="outline" 
+              onClick={() => setMessageDeleteDialogOpen(false)}
+              disabled={deletingMessage}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteMessage}
+              disabled={deletingMessage}
+            >
+              {deletingMessage ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

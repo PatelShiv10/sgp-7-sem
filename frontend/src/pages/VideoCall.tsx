@@ -1,274 +1,186 @@
 
-import React, { useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Settings, ArrowLeft } from 'lucide-react';
-import { useVideoCall } from '@/hooks/useVideoCall';
-import axios from 'axios';
+import { Card, CardContent } from '@/components/ui/card';
+import { Video, VideoOff, Mic, MicOff, PhoneOff, ArrowLeft } from 'lucide-react';
 
-const VideoCall: React.FC = () => {
-  const { callId } = useParams<{ callId: string }>();
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const { toast } = useToast();
-  
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+const VideoCall = () => {
+  const { sessionId } = useParams();
+  const [isJoined, setIsJoined] = useState(false);
+  const [videoEnabled, setVideoEnabled] = useState(true);
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  const {
-    state,
-    localStream,
-    remoteStream,
-    startCall,
-    endCall,
-    toggleMute,
-    toggleVideo
-  } = useVideoCall({
-    callId: callId || '',
-    userId: user?.id || '',
-    onCallEnded: () => {
-      toast({
-        title: "Call Ended",
-        description: "The call has been ended",
-      });
-    }
-  });
-
-  // Update video elements when streams change
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-    }
-  }, [localStream]);
+  // Mock appointment time - in real app, this would come from the booking
+  const appointmentTime = new Date();
+  appointmentTime.setMinutes(appointmentTime.getMinutes() + 2); // 2 minutes from now for demo
 
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
-    }
-  }, [remoteStream]);
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return () => clearInterval(timer);
+  }, []);
+
+  const canJoin = currentTime >= appointmentTime;
+
+  const handleJoinCall = () => {
+    setIsJoined(true);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'connected': return 'bg-green-100 text-green-800';
-      case 'connecting': return 'bg-yellow-100 text-yellow-800';
-      case 'ringing': return 'bg-blue-100 text-blue-800';
-      case 'ended': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const handleLeaveCall = () => {
+    setIsJoined(false);
   };
 
-  const handleBackToAppointments = () => {
-    navigate('/my-appointments');
-  };
-
-  const handleEndCall = async () => {
-    try {
-      // Update call status in backend
-      const token = localStorage.getItem('token');
-      await axios.post(`http://localhost:5000/api/video-calls/${callId}/end`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-    } catch (error) {
-      console.error('Error updating call status:', error);
-    }
-    
-    endCall();
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-6xl">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={handleBackToAppointments}
-              className="text-white hover:bg-gray-800"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Video Call</h1>
-              <p className="text-gray-400">Call ID: {callId}</p>
+  if (isJoined) {
+    return (
+      <div className="h-screen bg-black flex flex-col">
+        {/* Video Area */}
+        <div className="flex-1 relative">
+          {/* Main Video (Lawyer) */}
+          <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+            <div className="w-32 h-32 bg-teal text-white rounded-full flex items-center justify-center text-4xl font-semibold">
+              SJ
+            </div>
+            <div className="absolute bottom-4 left-4 text-white">
+              <p className="font-medium">Sarah Johnson</p>
+              <p className="text-sm opacity-75">Corporate Lawyer</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Badge className={getStatusColor(state.callStatus)}>
-              {state.callStatus.charAt(0).toUpperCase() + state.callStatus.slice(1)}
-            </Badge>
-            {state.isCallActive && (
-              <div className="text-white font-mono">
-                {formatDuration(state.callDuration)}
+
+          {/* User Video (Picture-in-Picture) */}
+          <div className="absolute top-4 right-4 w-48 h-36 bg-gray-700 rounded-lg overflow-hidden">
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="w-16 h-16 bg-gray-600 text-white rounded-full flex items-center justify-center text-xl font-semibold">
+                You
               </div>
-            )}
-            {state.remoteUser && (
-              <div className="text-white text-sm">
-                Connected to: {state.remoteUser.name}
-              </div>
-            )}
+            </div>
+          </div>
+
+          {/* Call Info */}
+          <div className="absolute top-4 left-4 bg-black/50 text-white px-4 py-2 rounded-lg">
+            <p className="text-sm">Legal Consultation</p>
+            <p className="text-lg font-mono">
+              {String(Math.floor(Math.random() * 60)).padStart(2, '0')}:
+              {String(Math.floor(Math.random() * 60)).padStart(2, '0')}
+            </p>
           </div>
         </div>
 
-        {/* Video Containers */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-          {/* Local Video */}
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-white">You</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                {state.isVideoOff && (
-                  <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
-                    <div className="w-20 h-20 bg-gray-600 rounded-full flex items-center justify-center">
-                      <span className="text-white text-2xl font-bold">
-                        {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-                {state.isMuted && (
-                  <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded text-xs">
-                    Muted
-                  </div>
-                )}
-                {!state.isConnected && (
-                  <div className="absolute top-2 right-2 bg-yellow-500 text-white px-2 py-1 rounded text-xs">
-                    Connecting...
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Remote Video */}
-          <Card className="bg-gray-800 border-gray-700">
-            <CardHeader>
-              <CardTitle className="text-white">
-                {state.remoteUser ? state.remoteUser.name : 'Remote User'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative aspect-video bg-gray-900 rounded-lg overflow-hidden">
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-                {!state.isCallActive && (
-                  <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-20 h-20 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span className="text-white text-2xl font-bold">?</span>
-                      </div>
-                      <p className="text-gray-400">
-                        {state.callStatus === 'idle' && 'Click "Start Call" to begin'}
-                        {state.callStatus === 'connecting' && 'Connecting...'}
-                        {state.callStatus === 'ringing' && 'Ringing...'}
-                        {state.callStatus === 'ended' && 'Call ended'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+        {/* Controls */}
+        <div className="bg-gray-900 p-6">
+          <div className="flex justify-center space-x-4">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setVideoEnabled(!videoEnabled)}
+              className={`rounded-full w-14 h-14 ${
+                videoEnabled 
+                  ? 'bg-gray-700 text-white hover:bg-gray-600' 
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              {videoEnabled ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => setAudioEnabled(!audioEnabled)}
+              className={`rounded-full w-14 h-14 ${
+                audioEnabled 
+                  ? 'bg-gray-700 text-white hover:bg-gray-600' 
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              {audioEnabled ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
+            </Button>
+            
+            <Button
+              variant="destructive"
+              size="lg"
+              onClick={handleLeaveCall}
+              className="rounded-full w-14 h-14 bg-red-600 hover:bg-red-700"
+            >
+              <PhoneOff className="h-6 w-6" />
+            </Button>
+          </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Call Controls */}
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="p-6">
-            <div className="flex justify-center items-center gap-4">
-              {/* Mute Button */}
-              <Button
-                onClick={toggleMute}
-                variant={state.isMuted ? "destructive" : "outline"}
-                size="lg"
-                className="w-16 h-16 rounded-full"
-                disabled={!state.isInCall}
-              >
-                {state.isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-              </Button>
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="max-w-2xl mx-auto px-4">
+        <Button asChild variant="ghost" className="mb-6">
+          <Link to="/find-lawyer">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Lawyers
+          </Link>
+        </Button>
 
-              {/* Video Toggle Button */}
-              <Button
-                onClick={toggleVideo}
-                variant={state.isVideoOff ? "destructive" : "outline"}
-                size="lg"
-                className="w-16 h-16 rounded-full"
-                disabled={!state.isInCall}
-              >
-                {state.isVideoOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
-              </Button>
+        <Card className="shadow-soft border-0">
+          <CardContent className="p-12 text-center">
+            <div className="w-24 h-24 bg-teal text-white rounded-full flex items-center justify-center text-2xl font-semibold mx-auto mb-6">
+              <Video className="h-12 w-12" />
+            </div>
+            
+            <h1 className="text-3xl font-bold text-navy mb-4">Video Consultation</h1>
+            
+            <div className="bg-blue-50 p-6 rounded-lg mb-8">
+              <h3 className="font-semibold text-navy mb-3">Session Details</h3>
+              <div className="space-y-2 text-gray-700">
+                <p><strong>Lawyer:</strong> Sarah Johnson</p>
+                <p><strong>Specialization:</strong> Corporate Law</p>
+                <p><strong>Session ID:</strong> {sessionId}</p>
+                <p><strong>Scheduled Time:</strong> {appointmentTime.toLocaleString()}</p>
+              </div>
+            </div>
 
-              {/* Start/End Call Button */}
-              {!state.isInCall ? (
+            {canJoin ? (
+              <div>
+                <p className="text-lg text-gray-600 mb-6">
+                  Your consultation session is ready to start.
+                </p>
                 <Button
-                  onClick={startCall}
-                  disabled={state.callStatus === 'connecting' || !state.isConnected}
+                  onClick={handleJoinCall}
                   size="lg"
-                  className="w-16 h-16 rounded-full bg-green-600 hover:bg-green-700"
+                  className="bg-teal hover:bg-teal-light text-white px-8 py-3 text-lg"
                 >
-                  <Phone className="h-6 w-6" />
+                  <Video className="h-5 w-5 mr-2" />
+                  Join Video Call
                 </Button>
-              ) : (
+              </div>
+            ) : (
+              <div>
+                <p className="text-lg text-gray-600 mb-4">
+                  Your session will start at {appointmentTime.toLocaleTimeString()}
+                </p>
+                <p className="text-sm text-gray-500 mb-6">
+                  The join button will be enabled at your scheduled appointment time.
+                </p>
                 <Button
-                  onClick={handleEndCall}
-                  variant="destructive"
+                  disabled
                   size="lg"
-                  className="w-16 h-16 rounded-full"
+                  className="px-8 py-3 text-lg opacity-50 cursor-not-allowed"
                 >
-                  <PhoneOff className="h-6 w-6" />
+                  <Video className="h-5 w-5 mr-2" />
+                  Join Video Call
                 </Button>
-              )}
+              </div>
+            )}
 
-              {/* Settings Button */}
-              <Button
-                variant="outline"
-                size="lg"
-                className="w-16 h-16 rounded-full"
-              >
-                <Settings className="h-6 w-6" />
-              </Button>
+            <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                <strong>Preparation Tips:</strong> Have your questions ready, ensure stable internet connection, 
+                and find a quiet space for the consultation.
+              </p>
             </div>
           </CardContent>
         </Card>
-
-        {/* Call Info */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-400 text-sm">
-            {state.callStatus === 'idle' && 'Click the green button to start the call'}
-            {state.callStatus === 'connecting' && 'Connecting to remote user...'}
-            {state.callStatus === 'ringing' && 'Calling remote user...'}
-            {state.callStatus === 'connected' && 'Call in progress'}
-            {state.callStatus === 'ended' && 'Call ended'}
-          </p>
-          {!state.isConnected && (
-            <p className="text-yellow-400 text-sm mt-2">
-              Connecting to signaling server...
-            </p>
-          )}
-        </div>
       </div>
     </div>
   );

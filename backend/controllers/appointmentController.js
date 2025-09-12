@@ -1,185 +1,87 @@
-const Appointment = require('../models/Appointment');
+const Booking = require('../models/Booking');
 const User = require('../models/User');
+const LawyerFeedback = require('../models/LawyerFeedback');
+const LawyerClient = require('../models/LawyerClient');
+const { validationResult } = require('express-validator');
 
-// Create a new appointment
-exports.createAppointment = async (req, res) => {
+// @desc    Get all appointments for a lawyer
+// @route   GET /api/appointments/lawyer
+// @access  Private (Lawyer)
+const getLawyerAppointments = async (req, res) => {
   try {
-    const { lawyerId, clientId, startsAt, endsAt, status, notes, meetingType, location, meetingLink } = req.body;
-    
-    // Validate required fields
-    if (!lawyerId || !clientId || !startsAt || !endsAt) {
-      return res.status(400).json({
-        success: false,
-        message: 'lawyerId, clientId, startsAt, and endsAt are required'
-      });
-    }
-
-    // Validate dates
-    const startDate = new Date(startsAt);
-    const endDate = new Date(endsAt);
-    const now = new Date();
-
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid date format for startsAt or endsAt'
-      });
-    }
-
-    if (startDate <= now) {
-      return res.status(400).json({
-        success: false,
-        message: 'Appointment start time must be in the future'
-      });
-    }
-
-    if (endDate <= startDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'End time must be after start time'
-      });
-    }
-
-    // Validate users exist and have correct roles
-    const [lawyer, client] = await Promise.all([
-      User.findById(lawyerId).select('role isVerified'),
-      User.findById(clientId).select('role')
-    ]);
-
-    if (!lawyer || lawyer.role !== 'lawyer' || !lawyer.isVerified) {
-      return res.status(404).json({
-        success: false,
-        message: 'Lawyer not found or not verified'
-      });
-    }
-
-    if (!client || client.role !== 'client') {
-      return res.status(404).json({
-        success: false,
-        message: 'Client not found'
-      });
-    }
-
-    // Check for scheduling conflicts
-    const conflictingAppointment = await Appointment.findOne({
-      lawyerId,
-      status: { $in: ['scheduled', 'confirmed'] },
-      $or: [
-        {
-          startsAt: { $lt: endDate },
-          endsAt: { $gt: startDate }
-        }
-      ]
-    });
-
-    if (conflictingAppointment) {
-      return res.status(409).json({
-        success: false,
-        message: 'This time slot conflicts with an existing appointment'
-      });
-    }
-
-    // Create the appointment
-    const appointment = new Appointment({
-      lawyerId,
-      clientId,
-      startsAt: startDate,
-      endsAt: endDate,
-      status: status || 'scheduled',
-      notes: notes || '',
-      meetingType: meetingType || 'video-call',
-      location: location || '',
-      meetingLink: meetingLink || ''
-    });
-
-    await appointment.save();
-
-    // Populate user details for response
-    await appointment.populate([
-      { path: 'lawyerId', select: 'firstName lastName email' },
-      { path: 'clientId', select: 'firstName lastName email' }
-    ]);
-
-    res.status(201).json({
-      success: true,
-      message: 'Appointment created successfully',
-      data: appointment
-    });
-
-  } catch (error) {
-    console.error('Error creating appointment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create appointment',
-      error: error.message
-    });
-  }
-};
-
-// Get all appointments for a lawyer
-exports.getLawyerAppointments = async (req, res) => {
-  try {
-    const { lawyerId } = req.params;
-    const { status, startDate, endDate, page = 1, limit = 20 } = req.query;
-
-    // Validate lawyer exists
-    const lawyer = await User.findById(lawyerId).select('role isVerified');
-    if (!lawyer || lawyer.role !== 'lawyer') {
-      return res.status(404).json({
-        success: false,
-        message: 'Lawyer not found'
-      });
-    }
+    const lawyerId = req.user.id;
+    const { 
+      page = 1, 
+      limit = 20, 
+      status, 
+      startDate, 
+      endDate, 
+      sortBy = 'date', 
+      sortOrder = 'asc' 
+    } = req.query;
 
     // Build query
     const query = { lawyerId };
     
-    if (status) {
+    if (status && status !== 'all') {
       query.status = status;
     }
-
-    if (startDate || endDate) {
-      query.startsAt = {};
-      if (startDate) {
-        query.startsAt.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        query.startsAt.$lte = new Date(endDate);
-      }
+    
+    if (startDate && endDate) {
+      query.date = { $gte: startDate, $lte: endDate };
+    } else if (startDate) {
+      query.date = { $gte: startDate };
+    } else if (endDate) {
+      query.date = { $lte: endDate };
     }
 
-    // Calculate pagination
+    // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    // Execute query with pagination
-    const [appointments, total] = await Promise.all([
-      Appointment.find(query)
-        .populate('lawyerId', 'firstName lastName email')
-        .populate('clientId', 'firstName lastName email')
-        .sort({ startsAt: 1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
-      Appointment.countDocuments(query)
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    // If sorting by date, also sort by start time
+    if (sortBy === 'date') {
+      sortObj.start = 1;
+    }
+
+    const appointments = await Booking.find(query)
+      .populate('userId', 'firstName lastName email phone')
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await Booking.countDocuments(query);
+
+    // Get statistics
+    const stats = await Booking.aggregate([
+      { $match: { lawyerId: req.user.id } },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
     ]);
 
-    // Calculate pagination info
-    const totalPages = Math.ceil(total / parseInt(limit));
-    const hasNextPage = parseInt(page) < totalPages;
-    const hasPrevPage = parseInt(page) > 1;
+    const statusCounts = {};
+    stats.forEach(stat => {
+      statusCounts[stat._id] = stat.count;
+    });
 
     res.json({
       success: true,
-      message: 'Appointments retrieved successfully',
       data: {
         appointments,
         pagination: {
           currentPage: parseInt(page),
-          totalPages,
+          totalPages: Math.ceil(total / parseInt(limit)),
           totalItems: total,
-          hasNextPage,
-          hasPrevPage,
-          limit: parseInt(limit)
-        }
+          hasNext: skip + appointments.length < total,
+          hasPrev: parseInt(page) > 1
+        },
+        stats: statusCounts
       }
     });
 
@@ -187,138 +89,260 @@ exports.getLawyerAppointments = async (req, res) => {
     console.error('Error fetching lawyer appointments:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch appointments',
-      error: error.message
+      message: 'Failed to fetch appointments'
     });
   }
 };
 
-// Get all appointments for the current user
-exports.getUserAppointments = async (req, res) => {
+// @desc    Get today's appointments for a lawyer
+// @route   GET /api/appointments/lawyer/today
+// @access  Private (Lawyer)
+const getTodaysAppointments = async (req, res) => {
   try {
+    const lawyerId = req.user.id;
+    const appointments = await Booking.findTodaysAppointments(lawyerId);
+
+    res.json({
+      success: true,
+      data: appointments
+    });
+
+  } catch (error) {
+    console.error('Error fetching today\'s appointments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch today\'s appointments'
+    });
+  }
+};
+
+// @desc    Get upcoming appointments for a lawyer
+// @route   GET /api/appointments/lawyer/upcoming
+// @access  Private (Lawyer)
+const getUpcomingAppointments = async (req, res) => {
+  try {
+    const lawyerId = req.user.id;
+    const { limit = 10 } = req.query;
+    
+    const appointments = await Booking.findUpcomingAppointments(lawyerId, parseInt(limit));
+
+    res.json({
+      success: true,
+      data: appointments
+    });
+
+  } catch (error) {
+    console.error('Error fetching upcoming appointments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch upcoming appointments'
+    });
+  }
+};
+
+// @desc    Get appointments by date range for calendar view
+// @route   GET /api/appointments/lawyer/calendar
+// @access  Private (Lawyer)
+const getCalendarAppointments = async (req, res) => {
+  try {
+    const lawyerId = req.user.id;
+    const { startDate, endDate, status } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Start date and end date are required'
+      });
+    }
+
+    const appointments = await Booking.findByDateRange(lawyerId, startDate, endDate, status);
+
+    // Format for calendar
+    const calendarEvents = appointments.map(appointment => ({
+      id: appointment._id,
+      title: `${appointment.appointmentType} - ${appointment.userId?.firstName} ${appointment.userId?.lastName}`,
+      start: `${appointment.date}T${appointment.start}`,
+      end: `${appointment.date}T${appointment.end}`,
+      status: appointment.status,
+      client: {
+        name: `${appointment.userId?.firstName} ${appointment.userId?.lastName}`,
+        email: appointment.userId?.email,
+        phone: appointment.userId?.phone
+      },
+      type: appointment.appointmentType,
+      meetingType: appointment.meetingType,
+      notes: appointment.notes,
+      clientNotes: appointment.clientNotes
+    }));
+
+    res.json({
+      success: true,
+      data: calendarEvents
+    });
+
+  } catch (error) {
+    console.error('Error fetching calendar appointments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch calendar appointments'
+    });
+  }
+};
+
+// @desc    Get dashboard statistics
+// @route   GET /api/appointments/lawyer/stats
+// @access  Private (Lawyer)
+const getDashboardStats = async (req, res) => {
+  try {
+    const lawyerId = req.user.id;
+    const today = new Date().toISOString().split('T')[0];
+    const thisMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+    // Today's appointments count
+    const todaysCount = await Booking.countDocuments({
+      lawyerId,
+      date: today,
+      status: { $in: ['pending', 'confirmed'] }
+    });
+
+    // This month's appointments count
+    const thisMonthCount = await Booking.countDocuments({
+      lawyerId,
+      date: { $regex: `^${thisMonth}` },
+      status: { $ne: 'cancelled' }
+    });
+
+    // Pending appointments count
+    const pendingCount = await Booking.countDocuments({
+      lawyerId,
+      status: 'pending',
+      date: { $gte: today }
+    });
+
+    // Total completed appointments
+    const completedCount = await Booking.countDocuments({
+      lawyerId,
+      status: 'completed'
+    });
+
+    // Recent activity (last 7 days)
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const recentActivity = await Booking.find({
+      lawyerId,
+      createdAt: { $gte: weekAgo }
+    })
+      .populate('userId', 'firstName lastName')
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean();
+
+    const activities = recentActivity.map(appointment => ({
+      id: appointment._id,
+      message: `New appointment booked by ${appointment.userId?.firstName} ${appointment.userId?.lastName}`,
+      time: appointment.createdAt,
+      type: 'booking'
+    }));
+
+    // Recent reviews (show immediately, regardless of approval)
+    let recentReviews = [];
+    try {
+      recentReviews = await LawyerFeedback.find({ lawyerId })
+        .sort({ createdAt: -1 })
+        .limit(3)
+        .select('rating comment clientName createdAt isApproved response')
+        .lean();
+    } catch (e) {
+      // non-fatal
+      recentReviews = [];
+    }
+
+    res.json({
+      success: true,
+      data: {
+        todaysAppointments: todaysCount,
+        thisMonthAppointments: thisMonthCount,
+        pendingAppointments: pendingCount,
+        completedAppointments: completedCount,
+        recentActivity: activities,
+        recentReviews
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch dashboard statistics'
+    });
+  }
+};
+
+// @desc    Get single appointment details
+// @route   GET /api/appointments/:id
+// @access  Private (Lawyer or Client)
+const getAppointmentDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
     const userId = req.user.id;
-    const { status, page = 1, limit = 20 } = req.query;
+    const userRole = req.user.role;
 
-    // Build query
-    const query = { clientId: userId };
-    if (status) {
-      query.status = status;
+    // Build query based on user role
+    let query = { _id: id };
+    if (userRole === 'lawyer') {
+      query.lawyerId = userId;
+    } else {
+      query.userId = userId;
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const appointment = await Booking.findOne(query)
+      .populate('lawyerId', 'firstName lastName email specialization')
+      .populate('userId', 'firstName lastName email phone')
+      .lean();
 
-    const [appointments, total] = await Promise.all([
-      Appointment.find(query)
-        .populate('lawyerId', 'firstName lastName email specialization')
-        .populate('clientId', 'firstName lastName email')
-        .sort({ startsAt: 1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
-      Appointment.countDocuments(query)
-    ]);
-
-    const totalPages = Math.ceil(total / parseInt(limit));
-
-    res.json({
-      success: true,
-      message: 'User appointments retrieved successfully',
-      data: {
-        appointments,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages,
-          totalItems: total,
-          hasNextPage: parseInt(page) < totalPages,
-          hasPrevPage: parseInt(page) > 1,
-          limit: parseInt(limit)
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('Error fetching user appointments:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch appointments',
-      error: error.message
-    });
-  }
-};
-
-// Get all appointments for a client (user)
-exports.getClientAppointments = async (req, res) => {
-  try {
-    const { clientId } = req.params;
-    const { status, startDate, endDate, page = 1, limit = 20 } = req.query;
-
-    // Validate client exists
-    const client = await User.findById(clientId).select('role');
-    if (!client || client.role !== 'user') {
+    if (!appointment) {
       return res.status(404).json({
         success: false,
-        message: 'Client not found'
+        message: 'Appointment not found or access denied'
       });
     }
 
-    // Build query
-    const query = { clientId };
-    if (status) {
-      query.status = status;
-    }
-    if (startDate || endDate) {
-      query.startsAt = {};
-      if (startDate) query.startsAt.$gte = new Date(startDate);
-      if (endDate) query.startsAt.$lte = new Date(endDate);
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    const [appointments, total] = await Promise.all([
-      Appointment.find(query)
-        .populate('lawyerId', 'firstName lastName email')
-        .populate('clientId', 'firstName lastName email')
-        .sort({ startsAt: 1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
-      Appointment.countDocuments(query)
-    ]);
-
-    const totalPages = Math.ceil(total / parseInt(limit));
-
     res.json({
       success: true,
-      message: 'Client appointments retrieved successfully',
-      data: {
-        appointments,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages,
-          totalItems: total,
-          hasNextPage: parseInt(page) < totalPages,
-          hasPrevPage: parseInt(page) > 1,
-          limit: parseInt(limit)
-        }
-      }
+      data: appointment
     });
 
   } catch (error) {
-    console.error('Error fetching client appointments:', error);
+    console.error('Error fetching appointment details:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch appointments',
-      error: error.message
+      message: 'Failed to fetch appointment details'
     });
   }
 };
 
-// Get appointment by ID
-exports.getAppointmentById = async (req, res) => {
+// @desc    Update appointment status
+// @route   PUT /api/appointments/:id/status
+// @access  Private (Lawyer)
+const updateAppointmentStatus = async (req, res) => {
   try {
-    const { appointmentId } = req.params;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array()
+      });
+    }
 
-    const appointment = await Appointment.findById(appointmentId)
-      .populate('lawyerId', 'firstName lastName email')
-      .populate('clientId', 'firstName lastName email');
+    const { id } = req.params;
+    const { status, reason, notes } = req.body;
+    const lawyerId = req.user.id;
+
+    const appointment = await Booking.findOne({ 
+      _id: id, 
+      lawyerId 
+    });
 
     if (!appointment) {
       return res.status(404).json({
@@ -327,81 +351,67 @@ exports.getAppointmentById = async (req, res) => {
       });
     }
 
-    res.json({
-      success: true,
-      message: 'Appointment retrieved successfully',
-      data: appointment
-    });
-
-  } catch (error) {
-    console.error('Error fetching appointment:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch appointment',
-      error: error.message
-    });
-  }
-};
-
-// Update appointment status
-exports.updateAppointmentStatus = async (req, res) => {
-  try {
-    const { appointmentId } = req.params;
-    const { status } = req.body;
-
-    if (!status) {
-      return res.status(400).json({
-        success: false,
-        message: 'Status is required'
-      });
+    // Update based on status
+    if (status === 'confirmed') {
+      await appointment.confirm();
+      try {
+        await LawyerClient.addClientFromAppointment(lawyerId, appointment.userId, {
+          appointmentType: appointment.appointmentType,
+          date: appointment.date,
+          start: appointment.start
+        });
+      } catch (error) {
+        console.error('Failed to add client relationship on confirmation:', error);
+      }
+    } else if (status === 'cancelled') {
+      await appointment.cancel(reason, lawyerId);
+    } else if (status === 'completed') {
+      await appointment.complete();
+    } else {
+      appointment.status = status;
+      await appointment.save();
     }
 
-    const validStatuses = ['scheduled', 'confirmed', 'completed', 'cancelled', 'no-show'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid status value'
-      });
+    // Add lawyer notes if provided
+    if (notes) {
+      appointment.lawyerNotes = notes;
+      await appointment.save();
     }
 
-    const appointment = await Appointment.findByIdAndUpdate(
-      appointmentId,
-      { status },
-      { new: true, runValidators: true }
-    ).populate([
-      { path: 'lawyerId', select: 'firstName lastName email' },
-      { path: 'clientId', select: 'firstName lastName email' }
-    ]);
-
-    if (!appointment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Appointment not found'
-      });
-    }
+    // Populate and return updated appointment
+    const updatedAppointment = await Booking.findById(id)
+      .populate('userId', 'firstName lastName email phone')
+      .lean();
 
     res.json({
       success: true,
-      message: 'Appointment status updated successfully',
-      data: appointment
+      message: `Appointment ${status} successfully`,
+      data: updatedAppointment
     });
 
   } catch (error) {
     console.error('Error updating appointment status:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update appointment status',
-      error: error.message
+      message: 'Failed to update appointment status'
     });
   }
 };
 
-// Delete appointment
-exports.deleteAppointment = async (req, res) => {
+// @desc    Add notes to appointment
+// @route   PUT /api/appointments/:id/notes
+// @access  Private (Lawyer)
+const updateAppointmentNotes = async (req, res) => {
   try {
-    const { appointmentId } = req.params;
+    const { id } = req.params;
+    const { lawyerNotes } = req.body;
+    const lawyerId = req.user.id;
 
-    const appointment = await Appointment.findByIdAndDelete(appointmentId);
+    const appointment = await Booking.findOneAndUpdate(
+      { _id: id, lawyerId },
+      { lawyerNotes },
+      { new: true }
+    ).populate('userId', 'firstName lastName email phone');
 
     if (!appointment) {
       return res.status(404).json({
@@ -412,15 +422,134 @@ exports.deleteAppointment = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Appointment deleted successfully'
+      message: 'Notes updated successfully',
+      data: appointment
     });
 
   } catch (error) {
-    console.error('Error deleting appointment:', error);
+    console.error('Error updating appointment notes:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to delete appointment',
-      error: error.message
+      message: 'Failed to update notes'
     });
   }
+};
+
+// @desc    Reschedule appointment
+// @route   PUT /api/appointments/:id/reschedule
+// @access  Private (Lawyer or Client)
+const rescheduleAppointment = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array()
+      });
+    }
+
+    const { id } = req.params;
+    const { date, start, durationMins } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Find appointment
+    let query = { _id: id };
+    if (userRole === 'lawyer') {
+      query.lawyerId = userId;
+    } else {
+      query.userId = userId;
+    }
+
+    const appointment = await Booking.findOne(query);
+
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
+    // Check if the new slot is available
+    const conflictingAppointment = await Booking.findOne({
+      lawyerId: appointment.lawyerId,
+      date,
+      start,
+      status: { $in: ['pending', 'confirmed'] },
+      _id: { $ne: id }
+    });
+
+    if (conflictingAppointment) {
+      return res.status(400).json({
+        success: false,
+        message: 'The selected time slot is not available'
+      });
+    }
+
+    // Update appointment
+    appointment.date = date;
+    appointment.start = start;
+    if (durationMins) {
+      appointment.durationMins = durationMins;
+    }
+    appointment.status = 'pending'; // Reset to pending after reschedule
+
+    await appointment.save();
+
+    const updatedAppointment = await Booking.findById(id)
+      .populate('lawyerId', 'firstName lastName')
+      .populate('userId', 'firstName lastName email phone')
+      .lean();
+
+    res.json({
+      success: true,
+      message: 'Appointment rescheduled successfully',
+      data: updatedAppointment
+    });
+
+  } catch (error) {
+    console.error('Error rescheduling appointment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reschedule appointment'
+    });
+  }
+};
+
+// @desc    Delete appointment
+// @route   DELETE /api/appointments/:id
+// @access  Private (Lawyer)
+const deleteAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const requester = req.user;
+    const existing = await Booking.findById(id).select('lawyerId');
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+
+    if (requester.role === 'lawyer' && String(existing.lawyerId) !== String(requester.id)) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    await Booking.findByIdAndDelete(id);
+    return res.json({ success: true, message: 'Appointment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting appointment:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete appointment' });
+  }
+};
+
+module.exports = {
+  getLawyerAppointments,
+  getTodaysAppointments,
+  getUpcomingAppointments,
+  getCalendarAppointments,
+  getDashboardStats,
+  getAppointmentDetails,
+  updateAppointmentStatus,
+  updateAppointmentNotes,
+  rescheduleAppointment,
+  deleteAppointment
 };

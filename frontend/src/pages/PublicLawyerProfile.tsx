@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Phone, MessageCircle, Calendar, Clock, DollarSign, Award, Users, CheckCircle, Shield, Loader2, Video } from 'lucide-react';
-import PaymentModal from '@/components/PaymentModal';
-import VideoCallInitiation from '@/components/VideoCallInitiation';
+import { MapPin, Star, Phone, MessageCircle, Calendar, Clock, DollarSign, Award, Users, CheckCircle, Shield, Loader2 } from 'lucide-react';
+import LawyerFeedbackDialog from '@/components/LawyerFeedbackDialog';
+import LawyerFeedbackList from '@/components/LawyerFeedbackList';
 
 interface PublicLawyer {
   _id: string;
@@ -26,8 +26,6 @@ const PublicLawyerProfile = () => {
   const [lawyer, setLawyer] = useState<PublicLawyer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showVideoCallModal, setShowVideoCallModal] = useState(false);
 
   useEffect(() => {
     const fetchLawyer = async () => {
@@ -71,23 +69,6 @@ const PublicLawyerProfile = () => {
   }
 
   const fullName = `${lawyer.firstName} ${lawyer.lastName}`;
-
-  const handlePaymentClick = () => {
-    setShowPaymentModal(true);
-  };
-
-  const handleWriteReview = () => {
-    window.location.href = `/review/${lawyer._id}`;
-  };
-
-  const handleVideoCallClick = () => {
-    setShowVideoCallModal(true);
-  };
-
-  const handleVideoCallInitiated = (callId: string) => {
-    setShowVideoCallModal(false);
-    // The VideoCallInitiation component will handle navigation
-  };
 
   return (
     <div className="min-h-screen py-16 bg-gray-50">
@@ -153,7 +134,7 @@ const PublicLawyerProfile = () => {
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 mt-6">
               <Button asChild className="flex-1 bg-teal hover:bg-teal-light text-white">
-                <Link to={`/booking-new/${lawyer._id}`}>
+                <Link to={`/booking/${lawyer._id}`}>
                   <Calendar className="h-4 w-4 mr-2" />
                   Book Consultation
                 </Link>
@@ -164,34 +145,14 @@ const PublicLawyerProfile = () => {
                   Send Message
                 </Link>
               </Button>
-              <Button 
-                variant="outline" 
-                className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
-                onClick={handlePaymentClick}
-              >
-                <DollarSign className="h-4 w-4 mr-2" />
-                Pay Lawyer
-              </Button>
-              <Button 
-                variant="outline" 
-                className="border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white"
-                onClick={handleWriteReview}
-              >
-                <Star className="h-4 w-4 mr-2" />
-                Write Review
-              </Button>
-              <Button 
-                variant="outline" 
-                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-                onClick={handleVideoCallClick}
-              >
-                <Video className="h-4 w-4 mr-2" />
-                Video Call
-              </Button>
               <Button variant="outline" className="border-gray-300">
                 <Phone className="h-4 w-4 mr-2" />
                 Call Now
               </Button>
+              <LawyerFeedbackDialog 
+                lawyerId={lawyer._id}
+                lawyerName={fullName}
+              />
             </div>
           </CardContent>
         </Card>
@@ -297,43 +258,16 @@ const PublicLawyerProfile = () => {
             </Card>
           </div>
         </div>
-      </div>
 
-      {/* Payment Modal */}
-      {lawyer && (
-        <PaymentModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          lawyerId={lawyer._id}
-          lawyerName={fullName}
-          amount={1500}
-          onSuccess={() => {
-            setShowPaymentModal(false);
-          }}
-          showReviewButton={true}
-        />
-      )}
-
-      {/* Video Call Initiation Modal */}
-      {showVideoCallModal && lawyer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full relative">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowVideoCallModal(false)}
-              className="absolute top-2 right-2 z-10"
-            >
-              ×
-            </Button>
-            <VideoCallInitiation
-              lawyerId={lawyer._id}
-              lawyerName={fullName}
-              onCallInitiated={handleVideoCallInitiated}
-            />
-          </div>
+        {/* Reviews Section */}
+        <div className="mt-8">
+          <LawyerFeedbackList 
+            lawyerId={lawyer._id}
+            showAll={true}
+            limit={5}
+          />
         </div>
-      )}
+      </div>
     </div>
   );
 };

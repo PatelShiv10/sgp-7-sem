@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { initializeUserKeys } from '@/utils/crypto';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -20,18 +19,6 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [userType, setUserType] = useState('user');
   const [isLoading, setIsLoading] = useState(false);
-
-  // Add no-scrollbar class to html and body when component mounts
-  useEffect(() => {
-    document.documentElement.classList.add('no-scrollbar');
-    document.body.classList.add('no-scrollbar');
-
-    // Remove the class when component unmounts
-    return () => {
-      document.documentElement.classList.remove('no-scrollbar');
-      document.body.classList.remove('no-scrollbar');
-    };
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,31 +43,23 @@ const Login = () => {
       if (response.ok) {
         // Store token in localStorage
         localStorage.setItem('token', data.token);
-
+        
         // Create user data object
         const userData = {
           firstName: data.user.firstName,
           lastName: data.user.lastName,
           email: data.user.email,
-          role: data.user.role as 'user' | 'lawyer' | 'admin',
+          userType: data.user.role as 'user' | 'lawyer' | 'admin',
           id: data.user.id
         };
-
+        
         login(userData);
-
-        // Initialize crypto keys after successful login
-        try {
-          await initializeUserKeys(userData.id);
-        } catch (error) {
-          console.warn('Failed to initialize crypto keys:', error);
-          // Don't block login if key initialization fails
-        }
-
+        
         toast({
           title: "Login successful!",
           description: `Welcome back, ${userData.firstName}!`,
         });
-
+        
         // Redirect based on user type
         if (userType === 'lawyer') {
           navigate('/lawyer-dashboard');
@@ -109,7 +88,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 no-scrollbar">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <h2 className="text-3xl font-bold text-navy">Welcome Back</h2>
@@ -126,7 +105,7 @@ const Login = () => {
               </TabsList>
             </Tabs>
           </CardHeader>
-
+          
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-6">
               <div>

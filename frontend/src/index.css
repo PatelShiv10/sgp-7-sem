@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
@@ -90,32 +91,4 @@ All colors MUST be HSL.
 
 .font-inter {
   font-family: 'Inter', sans-serif;
-}
-
-/* Hide scrollbar utilities */
-@layer utilities {
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    /* Internet Explorer 10+ */
-    scrollbar-width: none;
-    /* Firefox */
-  }
-
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-    /* Safari and Chrome */
-  }
-
-  /* Hide scrollbar on html and body */
-  html.no-scrollbar,
-  body.no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-    overflow: hidden;
-  }
-
-  html.no-scrollbar::-webkit-scrollbar,
-  body.no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
 }
