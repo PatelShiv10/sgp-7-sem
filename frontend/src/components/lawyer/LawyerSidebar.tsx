@@ -38,8 +38,8 @@ export const LawyerSidebar = ({ currentPage, setCurrentPage }: LawyerSidebarProp
     { id: 'messages', label: 'Messages', icon: MessageCircle, path: '/lawyer-messages' },
     // { id: 'video-calls', label: 'Video Calls', icon: Video, path: '/lawyer-video-calls' },
     { id: 'profile', label: 'Profile', icon: User, path: '/lawyer-profile' },
-    { id: 'payments', label: 'Payments', icon: CreditCard, path: '/lawyer-dashboard' },
-    // { id: 'payments', label: 'Payments', icon: CreditCard, path: '/lawyer-payments' },
+    // { id: 'payments', label: 'Payments', icon: CreditCard, path: '/lawyer-dashboard' },
+    { id: 'payments', label: 'Payments', icon: CreditCard, path: '/lawyer-payments' },
     { id: 'reviews', label: 'Reviews', icon: Star, path: '/lawyer-reviews' },
     { id: 'settings', label: 'Settings', icon: Settings, path: '/lawyer-settings' }
   ];
