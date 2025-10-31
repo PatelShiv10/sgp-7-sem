@@ -180,7 +180,7 @@ const FindLawyer = () => {
                       {lawyer.experience ? `${lawyer.experience} years experience` : 'Experience not specified'}
                     </span>
                     <span className="font-semibold text-teal flex items-center">
-                      <DollarSign className="h-4 w-4 mr-1" />
+  
                       {(() => {
                         const fee = Number((lawyer as any).consultationFee);
                         return Number.isFinite(fee) && fee >= 0 ? `₹${fee}` : 'Fee not specified';
