@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Phone, MessageCircle, Calendar, Shield, Loader2 } from 'lucide-react';
+import { MapPin, Star, Phone, MessageCircle, Calendar, Shield, Loader2, DollarSign } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLawyers } from '@/hooks/useLawyers';
 
@@ -179,7 +179,13 @@ const FindLawyer = () => {
                     <span className="text-gray-600">
                       {lawyer.experience ? `${lawyer.experience} years experience` : 'Experience not specified'}
                     </span>
-                    <span className="font-semibold text-teal">Rs 250/hr</span>
+                    <span className="font-semibold text-teal flex items-center">
+                      <DollarSign className="h-4 w-4 mr-1" />
+                      {(() => {
+                        const fee = Number((lawyer as any).consultationFee);
+                        return Number.isFinite(fee) && fee >= 0 ? `₹${fee}` : 'Fee not specified';
+                      })()}
+                    </span>
                   </div>
                   <div className="flex space-x-2 pt-4">
                     <Button asChild size="sm" className="flex-1 bg-teal hover:bg-teal-light text-white">

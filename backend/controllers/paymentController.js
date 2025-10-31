@@ -2,6 +2,7 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const User = require('../models/User');
 const Booking = require('../models/Booking');
+const LawyerClient = require('../models/LawyerClient');
 const { sendBookingConfirmationEmail } = require('../utils/sendBookingConfirmationEmail');
 const mongoose = require('mongoose');
 
@@ -171,6 +172,17 @@ exports.verifyAndCreateBooking = async (req, res) => {
       paymentCurrency: orderDetails?.currency || 'INR',
       paymentStatus: 'paid'
     });
+
+    // Ensure client appears in the lawyer's dashboard immediately (for paid bookings)
+    try {
+      await LawyerClient.addClientFromAppointment(lawyerId, userId, {
+        appointmentType: appointmentType || 'consultation',
+        date,
+        start
+      });
+    } catch (relErr) {
+      console.warn('addClientFromAppointment (paid booking) failed:', relErr?.message || relErr);
+    }
 
     // Send confirmation email to the client (production-ready helper)
     try {

@@ -216,13 +216,14 @@ exports.updateMyProfile = async (req, res) => {
       'bio',
       'education',
       'certifications',
-      'profileImage'
+      'profileImage',
+      'consultationFee'
     ];
 
     const updates = {};
     for (const field of allowedFields) {
       if (Object.prototype.hasOwnProperty.call(req.body, field)) {
-        updates[field] = req.body[field];
+        updates[field] = field === 'consultationFee' ? Number(req.body[field]) : req.body[field];
       }
     }
 

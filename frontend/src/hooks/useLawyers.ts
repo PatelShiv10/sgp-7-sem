@@ -13,6 +13,7 @@ interface Lawyer {
   barNumber?: string;
   bio?: string;
   profileImage?: string;
+  consultationFee?: number;
   isVerified: boolean;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;

@@ -167,7 +167,16 @@ exports.createBooking = async (req, res) => {
       clientNotes: req.body.notes || ''
     });
 
-    // Client-lawyer relationship removed; no side-effects
+    // Ensure client appears in the lawyer's dashboard immediately
+    try {
+      await LawyerClient.addClientFromAppointment(lawyerId, userId, {
+        appointmentType: req.body.appointmentType || 'consultation',
+        date,
+        start
+      });
+    } catch (e) {
+      console.warn('addClientFromAppointment (pending booking) failed:', e?.message || e);
+    }
 
     res.status(201).json({ success: true, message: 'Booking confirmed', data: booking });
   } catch (error) {

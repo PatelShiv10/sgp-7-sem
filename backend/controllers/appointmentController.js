@@ -4,6 +4,7 @@ const LawyerFeedback = require('../models/LawyerFeedback');
 const LawyerClient = require('../models/LawyerClient');
 const { validationResult } = require('express-validator');
 const { sendMail } = require('../utils/mailer');
+const { sendBookingCancellationEmail } = require('../utils/sendBookingCancellationEmail');
 
 // @desc    Get all appointments for a lawyer
 // @route   GET /api/appointments/lawyer
@@ -395,13 +396,18 @@ const updateAppointmentStatus = async (req, res) => {
         });
       }
     } else if (status === 'cancelled') {
-      // Send rejection/refund email to user
-      if (user?.email) {
-        await sendMail({
-          to: user.email,
-          subject: 'Booking Not Approved – Refund Initiated',
-          html: `<p>Hi ${user.firstName},</p><p>We regret to inform you your appointment with ${lawyer.firstName} ${lawyer.lastName} could not be approved and has been <b>cancelled</b>.<br>Any booking payment will be refunded within a week.<br>If you have questions, reply to this email.<br>Thank you for considering LawMate.</p>`
-        });
+      // Send cancellation email including lawyer-provided reason
+      try {
+        await sendBookingCancellationEmail(user, popAppointment, reason || '');
+      } catch (_) {
+        // fall back to simple mail if helper fails
+        if (user?.email) {
+          await sendMail({
+            to: user.email,
+            subject: 'Appointment Cancelled – LawMate',
+            html: `<p>Hi ${user.firstName},</p><p>Your appointment with ${lawyer.firstName} ${lawyer.lastName} has been <b>cancelled</b>.</p>${reason ? `<p><b>Reason:</b> ${reason}</p>` : ''}`
+          });
+        }
       }
     } else if (status === 'postponed' || status === 'rescheduled') {
       // Send reschedule notice to user

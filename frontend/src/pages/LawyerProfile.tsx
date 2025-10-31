@@ -37,7 +37,8 @@ const LawyerProfile = () => {
     barNumber: '',
     bio: '',
     education: [] as string[],
-    certifications: [] as string[]
+    certifications: [] as string[],
+    consultationFee: ''
   });
   const [availability, setAvailability] = useState<DaySchedule[]>([]);
   const [savingAvailability, setSavingAvailability] = useState(false);
@@ -79,7 +80,8 @@ const LawyerProfile = () => {
           barNumber: u.barNumber || '',
           bio: u.bio || '',
           education: Array.isArray(u.education) ? u.education : [],
-          certifications: Array.isArray(u.certifications) ? u.certifications : []
+          certifications: Array.isArray(u.certifications) ? u.certifications : [],
+          consultationFee: (u.consultationFee ?? '').toString()
         });
         if (u.profileImage && !localStorage.getItem('lawyerProfileImage')) {
           localStorage.setItem('lawyerProfileImage', u.profileImage);
@@ -123,6 +125,7 @@ const LawyerProfile = () => {
       const payload = {
         ...form,
         experience: form.experience ? Number(form.experience) : undefined,
+        consultationFee: form.consultationFee !== '' ? Number(form.consultationFee) : undefined,
         profileImage: profileImage || undefined
       };
       const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyers/me`, {
@@ -323,6 +326,14 @@ const LawyerProfile = () => {
                           rows={4}
                           disabled={loading}
                         />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Consultation Fee (INR)
+                        </label>
+                        <Input type="number" min={0} step="1" value={form.consultationFee} onChange={handleChange('consultationFee')} disabled={loading} />
+                        <p className="text-xs text-gray-500 mt-1">Shown publicly on Find a Lawyer and your public profile.</p>
                       </div>
 
                       <Button onClick={handleSave} disabled={saving} className="w-full bg-teal hover:bg-teal-light text-white">

@@ -26,6 +26,7 @@ const ChatWithLawyer = () => {
   const [messageDeleteDialogOpen, setMessageDeleteDialogOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
   const [deletingMessage, setDeletingMessage] = useState(false);
+  const [lawyerData, setLawyerData] = useState<any>(null);
 
   const userId = user?.id;
 
@@ -53,6 +54,25 @@ const ChatWithLawyer = () => {
     };
     fetchConversation();
   }, [lawyerId, userId]);
+
+  // Fetch lawyer data including consultation fee
+  useEffect(() => {
+    const fetchLawyerData = async () => {
+      try {
+        if (!lawyerId) return;
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyer/${lawyerId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to load lawyer data');
+        const data = await res.json();
+        setLawyerData(data.data);
+      } catch (e) {
+        console.error('Failed to load lawyer data:', e);
+      }
+    };
+    fetchLawyerData();
+  }, [lawyerId]);
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || !lawyerId || !userId) return;
@@ -156,13 +176,22 @@ const ChatWithLawyer = () => {
     setMessageDeleteDialogOpen(true);
   };
 
-  const lawyer = {
-    name: 'Lawyer',
-    specialization: 'General Law',
-    avatar: 'L',
-   
-    hourlyRate: 250
-  };
+  const lawyer = useMemo(() => {
+    if (lawyerData) {
+      return {
+        name: `${lawyerData.firstName || ''} ${lawyerData.lastName || ''}`,
+        specialization: lawyerData.specialization || 'General Law',
+        avatar: lawyerData.firstName ? lawyerData.firstName.charAt(0) : 'L',
+        hourlyRate: lawyerData.consultationFee || 0
+      };
+    }
+    return {
+      name: 'Lawyer',
+      specialization: 'General Law',
+      avatar: 'L',
+      hourlyRate: 0
+    };
+  }, [lawyerData]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -193,9 +222,9 @@ const ChatWithLawyer = () => {
           <div className="flex space-x-2">
             
             
-            <Button asChild size="sm" className="bg-teal hover:bg-teal-light text-white">
+            {/* <Button asChild size="sm" className="bg-teal hover:bg-teal-light text-white">
               <Link to={`/booking/${lawyerId}`}>Book Consultation</Link>
-            </Button>
+            </Button> */}
           </div>
         </div>
 
@@ -263,11 +292,11 @@ const ChatWithLawyer = () => {
 
           {/* Lawyer Info Sidebar */}
           <div className="w-80">
-            <Card className="shadow-soft border-0">
+            <Card className="shadow-soft border-0 h-[70vh] flex flex-col">
               <CardHeader>
                 <CardTitle className="text-lg text-navy">Lawyer Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 flex-1 overflow-y-auto">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-teal text-white rounded-full flex items-center justify-center text-xl font-semibold mx-auto mb-3">
                     {lawyer.avatar}
@@ -278,8 +307,10 @@ const ChatWithLawyer = () => {
 
                 <div className="space-y-3 border-t pt-4">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Rate:</span>
-                    <span className="font-medium">RS{lawyer.hourlyRate}/hour</span>
+                    <span className="text-gray-600">Consultation Fee:</span>
+                    <span className="font-medium">
+                      {lawyer.hourlyRate > 0 ? `₹${lawyer.hourlyRate}` : 'Fee not specified'}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Response Time:</span>

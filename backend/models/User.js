@@ -26,6 +26,8 @@ const userSchema = new mongoose.Schema({
   bio: { type: String },
   education: { type: [String], default: [] },
   certifications: { type: [String], default: [] },
+  // Public fee displayed in Find a Lawyer and used in booking UI
+  consultationFee: { type: Number, min: 0, default: 0 },
   availability: { type: [dayScheduleSchema], default: [] },
   profileImage: { type: String },
   agree: { type: Boolean, required: true },

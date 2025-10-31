@@ -51,7 +51,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",  # Vite dev server
         "http://localhost:3000",  # Alternative React dev port
-        os.getenv("BACKEND_URL", "http://localhost:5000"),  # Your backend port
+        "http://localhost:5000",  # Your backend port
         "https://lovable.dev",    # Your deployment platform
     ],
     allow_credentials=True,

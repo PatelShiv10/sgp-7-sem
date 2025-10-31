@@ -12,6 +12,7 @@ interface PublicLawyer {
   firstName: string;
   lastName: string;
   specialization?: string;
+  consultationFee?: number;
 }
 
 interface SlotsByDate { date: string; slots: string[] }
@@ -137,8 +138,11 @@ const AppointmentBooking = () => {
       const ok = await loadRazorpayScript();
       if (!ok) throw new Error('Failed to load payment gateway. Disable ad blockers and try again.');
 
-      // Amount in paise (e.g., Rs 250 => 25000)
-      const order = await paymentService.createOrder({ amount: 25000, notes: { lawyerId, purpose: 'appointment' } });
+      // Amount in paise based on lawyer's consultation fee (fallback to 250 if not set)
+      const feeInr = typeof lawyer.consultationFee === 'number' && lawyer.consultationFee >= 0
+        ? lawyer.consultationFee
+        : 250;
+      const order = await paymentService.createOrder({ amount: Math.round(feeInr * 100), notes: { lawyerId, purpose: 'appointment' } });
       if (!order?.orderId || !order?.key) {
         throw new Error('Payment initialization failed. Please check server keys.');
       }
@@ -416,8 +420,12 @@ const AppointmentBooking = () => {
                       <span className="font-medium">1 hour</span>
                     </div>
                     <div className="flex justify-between text-lg font-semibold border-t pt-3">
-                      <span>Total:</span>
-                      <span className="text-navy">Rs 250</span>
+                      <span>Consultation Fee:</span>
+                      <span className="text-navy">
+                        {typeof lawyer.consultationFee === 'number' && lawyer.consultationFee >= 0 
+                          ? `₹${lawyer.consultationFee}` 
+                          : 'Fee not specified'}
+                      </span>
                     </div>
                   </div>
 

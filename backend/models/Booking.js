@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const LawyerClient = require('./LawyerClient');
 
 const bookingSchema = new mongoose.Schema({
   lawyerId: { 
@@ -272,6 +273,28 @@ bookingSchema.pre('save', function(next) {
   }
   
   next();
+});
+
+// After a booking is created, ensure a lawyer-client relationship exists.
+// This catches ALL creation paths (direct booking, payment-verified booking, seeders).
+bookingSchema.post('save', async function(doc) {
+  try {
+    // Only on new documents
+    if (!doc.isNew) return;
+    const relation = await LawyerClient.addClientFromAppointment(doc.lawyerId, doc.userId, {
+      appointmentType: doc.appointmentType,
+      date: doc.date,
+      start: doc.start
+    });
+    if (relation && !doc.clientRelationshipId) {
+      await doc.model('Booking').findByIdAndUpdate(doc._id, { clientRelationshipId: relation._id });
+    }
+  } catch (e) {
+    // Non-fatal: do not block booking creation if relationship fails
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('post-save addClientFromAppointment failed:', e?.message || e);
+    }
+  }
 });
 
 module.exports = mongoose.model('Booking', bookingSchema);
