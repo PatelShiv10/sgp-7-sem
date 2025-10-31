@@ -6,10 +6,11 @@ Test script for the NyAI Legal Chatbot API
 import requests
 import json
 import time
+import os
 
 # Configuration
 CHATBOT_URL = "http://localhost:8002"
-BACKEND_URL = "http://localhost:5000/api"
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:5000/api")
 
 def test_chatbot_direct():
     """Test the FastAPI chatbot service directly"""

@@ -72,7 +72,7 @@ const LawyerReviews = () => {
       if (!userId) return; // no-op if not available
 
       const response = await fetch(
-        `http://localhost:5000/api/lawyer-feedback/lawyer/${userId}/summary`,
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyer-feedback/lawyer/${userId}/summary`,
         {
           headers: {
             ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -105,7 +105,7 @@ const LawyerReviews = () => {
       if (!userId) return; // no-op if not available
 
       const response = await fetch(
-        `http://localhost:5000/api/lawyer-feedback/lawyer/${userId}`,
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyer-feedback/lawyer/${userId}`,
         {
           headers: {
             ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -157,7 +157,7 @@ const LawyerReviews = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:5000/api/lawyer-feedback/${selectedReview._id}/respond`,
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyer-feedback/${selectedReview._id}/respond`,
         {
           method: 'PUT',
           headers: {

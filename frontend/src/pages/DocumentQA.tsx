@@ -44,7 +44,7 @@ const DocumentQA = () => {
           content_type: file.type,
         };
         console.log('Uploading document:', payload.filename);
-        const response = await axios.post('http://localhost:5000/api/documentqa/upload', payload, {
+        const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/documentqa/upload`, payload, {
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -74,7 +74,7 @@ const DocumentQA = () => {
     setIsLoading(true);
     setAnswer('');
     try {
-      const response = await axios.post('http://localhost:5000/api/documentqa/question', {
+      const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/documentqa/question`, {
         question,
         document_id: documentId,
         context: '',

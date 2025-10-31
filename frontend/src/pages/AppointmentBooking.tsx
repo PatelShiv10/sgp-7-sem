@@ -41,7 +41,7 @@ const AppointmentBooking = () => {
     const loadLawyer = async () => {
       try {
         setLoadingLawyer(true);
-        const res = await fetch(`http://localhost:5000/api/lawyers/${lawyerId}/public`);
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyers/${lawyerId}/public`);
         if (!res.ok) throw new Error('Failed to load');
         const data = await res.json();
         setLawyer(data.data);
@@ -61,7 +61,7 @@ const AppointmentBooking = () => {
       const start = new Date(month.getFullYear(), month.getMonth(), 1);
       const end = new Date(month.getFullYear(), month.getMonth() + 1, 0);
       const qs = `start=${fmtDate(start)}&end=${fmtDate(end)}`;
-      const res = await fetch(`http://localhost:5000/api/bookings/lawyers/${lawyerId}/slots?${qs}`);
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/bookings/lawyers/${lawyerId}/slots?${qs}`);
       if (!res.ok) throw new Error('Failed to load slots');
       const data = await res.json();
       setSlots(data.data);
@@ -178,7 +178,7 @@ const AppointmentBooking = () => {
           const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = response || {};
           // On successful payment, verify and create booking on server
           const token = localStorage.getItem('token');
-          const res = await fetch('http://localhost:5000/api/payments/verify', {
+          const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/payments/verify`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -263,9 +263,9 @@ const AppointmentBooking = () => {
               Your appointment has been successfully scheduled. You will receive a confirmation email shortly.
             </p>
             <div className="space-y-3">
-              <Link to="/dashboard">
+              <Link to="/">
                 <Button className="w-full bg-teal hover:bg-teal-light text-white">
-                  Go to Dashboard
+                  Go to Home
                 </Button>
               </Link>
               <Link to="/find-lawyer">

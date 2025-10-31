@@ -52,7 +52,7 @@ const Signup = () => {
     setSuccess('');
 
     // Prepare data
-    let endpoint = 'http://localhost:5000/api/auth/signup/user';
+    let endpoint = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/signup/user`;
     let payload: any = {
       firstName,
       lastName,
@@ -63,7 +63,7 @@ const Signup = () => {
       agree: agree ? 'true' : 'false',
     };
     if (userType === 'lawyer') {
-      endpoint = 'http://localhost:5000/api/auth/signup/lawyer';
+      endpoint = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/signup/lawyer`;
       payload = {
         ...payload,
         specialization,
@@ -130,7 +130,7 @@ const Signup = () => {
 
   const handleVerifyOtpAuto = async (otpValue: string) => {
     try {
-      const res = await fetch('http://localhost:5000/api/auth/verify-otp', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: signupEmail, otp: otpValue }),

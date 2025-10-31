@@ -39,7 +39,7 @@ const ChatWithLawyer = () => {
         setError(null);
         const token = localStorage.getItem('token');
         const params = new URLSearchParams({ lawyerId, userId });
-        const res = await fetch(`http://localhost:5000/api/chat/conversation?${params.toString()}`, {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/chat/conversation?${params.toString()}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (!res.ok) throw new Error('Failed to load messages');
@@ -67,7 +67,7 @@ const ChatWithLawyer = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/chat/message', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/chat/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +102,7 @@ const ChatWithLawyer = () => {
       console.log(`Deleting message with ID: ${messageToDelete._id}`);
       
       // Make the DELETE request
-      const response = await fetch(`http://localhost:5000/api/chat/message/${messageToDelete._id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/chat/message/${messageToDelete._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -160,7 +160,7 @@ const ChatWithLawyer = () => {
     name: 'Lawyer',
     specialization: 'General Law',
     avatar: 'L',
-    status: 'online',
+   
     hourlyRate: 250
   };
 
@@ -183,24 +183,16 @@ const ChatWithLawyer = () => {
               <div>
                 <h2 className="font-semibold text-navy">{lawyer.name}</h2>
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm text-gray-600">{lawyer.status}</span>
+                  
+                  
                 </div>
               </div>
             </div>
           </div>
           
           <div className="flex space-x-2">
-            <Button variant="outline" size="sm">
-              <Phone className="h-4 w-4 mr-2" />
-              Call
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link to={`/video-call/${lawyerId}-${Date.now()}`}>
-                <Video className="h-4 w-4 mr-2" />
-                Video
-              </Link>
-            </Button>
+            
+            
             <Button asChild size="sm" className="bg-teal hover:bg-teal-light text-white">
               <Link to={`/booking/${lawyerId}`}>Book Consultation</Link>
             </Button>
@@ -294,10 +286,10 @@ const ChatWithLawyer = () => {
                     <span className="font-medium">&lt; 5 minutes</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Status:</span>
+                   
                     <div className="flex items-center space-x-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="font-medium text-green-600">Online</span>
+                      
+                      
                     </div>
                   </div>
                 </div>

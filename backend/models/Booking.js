@@ -118,7 +118,20 @@ const bookingSchema = new mongoose.Schema({
   review: {
     type: String,
     maxlength: 1000
-  }
+  },
+  // Payment metadata (populated when booking is created via payment)
+  paymentProvider: {
+    type: String,
+    enum: ['razorpay', 'manual', 'other'],
+    default: undefined
+  },
+  paymentOrderId: { type: String },
+  paymentId: { type: String },
+  paymentSignature: { type: String },
+  paymentAmountPaise: { type: Number },
+  paymentCurrency: { type: String },
+  paymentStatus: { type: String },
+  paymentMethod: { type: String }
 }, { 
   timestamps: true,
   toJSON: { virtuals: true },
@@ -130,6 +143,7 @@ bookingSchema.index({ lawyerId: 1, date: 1, start: 1 }, { unique: true });
 bookingSchema.index({ userId: 1, date: 1 });
 bookingSchema.index({ date: 1, status: 1 });
 bookingSchema.index({ lawyerId: 1, status: 1, date: 1 });
+bookingSchema.index({ paymentId: 1 });
 
 // Virtual for full date-time
 bookingSchema.virtual('startDateTime').get(function() {

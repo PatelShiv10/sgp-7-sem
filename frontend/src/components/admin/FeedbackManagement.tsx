@@ -36,7 +36,7 @@ export const FeedbackManagement = () => {
       setLoading(true);
       setError(null);
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/feedback', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/feedback`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to load feedback');
@@ -62,7 +62,7 @@ export const FeedbackManagement = () => {
   const handleStatusChange = async (id: string, newStatus: 'pending' | 'resolved') => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/feedback/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/feedback/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ status: newStatus })

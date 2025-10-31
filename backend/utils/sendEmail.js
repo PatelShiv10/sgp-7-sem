@@ -1,10 +1,7 @@
 const nodemailer = require('nodemailer');
 
-// Build a transport from environment variables.
-// Prefer explicit SMTP settings when provided; otherwise fall back to Gmail service.
 function createTransport() {
-  const hasCustomSmtp = !!process.env.SMTP_HOST;
-  if (hasCustomSmtp) {
+  if (process.env.SMTP_HOST) {
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT || 587),
@@ -19,34 +16,42 @@ function createTransport() {
     service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS, // For Gmail: must be an App Password if 2FA enabled
+      pass: process.env.EMAIL_PASS,
     },
   });
 }
 
 const transporter = createTransport();
 
-async function sendMail({ to, subject, html, text, replyTo }) {
+/**
+ * Send an email using Nodemailer and .env credentials.
+ * @param {string|string[]} to
+ * @param {string} subject
+ * @param {string} html
+ * @param {{ text?: string, replyTo?: string }} [opts]
+ * @returns {Promise<boolean>}
+ */
+async function sendEmail(to, subject, html, opts = {}) {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.warn('EMAIL_USER or EMAIL_PASS not set; skipping email to', to);
     return false;
   }
-  const fromAddress = process.env.EMAIL_FROM || `"LawMate" <${process.env.EMAIL_USER}>`;
   try {
-    // Optionally verify connection in development
     if (process.env.NODE_ENV !== 'production') {
-      try { await transporter.verify(); } catch (_) { /* ignore verify errors */ }
+      try { await transporter.verify(); } catch (_) { /* ignore verify errors in dev */ }
     }
-    const info = await transporter.sendMail({ from: fromAddress, to, subject, html, text, replyTo });
-    // Helpful log in dev
+    const from = process.env.EMAIL_FROM || `"${process.env.APP_NAME || 'LawMate'}" <${process.env.EMAIL_USER}>`;
+    const info = await transporter.sendMail({ from, to, subject, html, text: opts.text, replyTo: opts.replyTo });
     if (process.env.NODE_ENV !== 'production') {
       console.log('Mail sent:', { messageId: info.messageId, to });
     }
     return true;
   } catch (err) {
-    console.error('sendMail error:', err?.message || err);
+    console.error('sendEmail error:', err?.message || err);
     return false;
   }
 }
 
-module.exports = { sendMail };
+module.exports = { sendEmail };
+
+

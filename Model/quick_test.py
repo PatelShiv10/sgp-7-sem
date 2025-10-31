@@ -5,6 +5,7 @@ Quick test to verify the chatbot service is working
 
 import requests
 import json
+import os
 
 def test_connection():
     """Test if the chatbot service is accessible"""
@@ -29,7 +30,8 @@ def test_backend_connection():
     """Test if the backend can reach the chatbot service"""
     try:
         print("🔍 Testing backend connection to chatbot...")
-        response = requests.get("http://localhost:5000/api/chatbot/health", timeout=5)
+        backend_url = os.getenv("BACKEND_URL", "http://localhost:5000")
+        response = requests.get(f"{backend_url}/api/chatbot/health", timeout=5)
         if response.status_code == 200:
             print("✅ Backend can reach chatbot service")
             return True

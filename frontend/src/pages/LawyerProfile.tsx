@@ -61,8 +61,8 @@ const LawyerProfile = () => {
         setLoading(true);
         const token = localStorage.getItem('token');
         const [resProfile, resAvailability] = await Promise.all([
-          fetch('http://localhost:5000/api/lawyers/me', { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch('http://localhost:5000/api/lawyers/me/availability', { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyers/me`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyers/me/availability`, { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
 
         if (!resProfile.ok) throw new Error('Failed to load profile');
@@ -125,7 +125,7 @@ const LawyerProfile = () => {
         experience: form.experience ? Number(form.experience) : undefined,
         profileImage: profileImage || undefined
       };
-      const res = await fetch('http://localhost:5000/api/lawyers/me', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyers/me`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -168,7 +168,7 @@ const LawyerProfile = () => {
     try {
       setSavingAvailability(true);
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/lawyers/me/availability', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyers/me/availability`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

@@ -2,6 +2,8 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const User = require('../models/User');
 const Booking = require('../models/Booking');
+const { sendBookingConfirmationEmail } = require('../utils/sendBookingConfirmationEmail');
+const mongoose = require('mongoose');
 
 function toMinutes(hhmm) {
   const [h, m] = hhmm.split(':').map(Number);
@@ -159,8 +161,24 @@ exports.verifyAndCreateBooking = async (req, res) => {
       status: 'confirmed',
       appointmentType: appointmentType || 'consultation',
       meetingType: meetingType || 'video_call',
-      clientNotes: notes || ''
+      clientNotes: notes || '',
+      // Persist payment details for payments listing
+      paymentProvider: 'razorpay',
+      paymentOrderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      paymentSignature: razorpay_signature,
+      paymentAmountPaise: Number(orderDetails?.amount || 0),
+      paymentCurrency: orderDetails?.currency || 'INR',
+      paymentStatus: 'paid'
     });
+
+    // Send confirmation email to the client (production-ready helper)
+    try {
+      const client = await User.findById(userId).select('firstName lastName email');
+      await sendBookingConfirmationEmail(client, created);
+    } catch (mailErr) {
+      console.warn('Booking confirmation email failed:', mailErr);
+    }
 
     return res.status(201).json({ success: true, message: 'Payment verified, booking created', data: created });
   } catch (error) {
@@ -172,4 +190,36 @@ exports.verifyAndCreateBooking = async (req, res) => {
   }
 };
 
+// GET /api/payments
+// Returns normalized list of payments derived from bookings for the authenticated lawyer
+exports.listPayments = async (req, res) => {
+  try {
+    const authUserId = req.user?.id;
+    if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    // Only show payments for the current lawyer
+    const lawyerId = authUserId;
+
+    const bookings = await Booking.find({
+      lawyerId: new mongoose.Types.ObjectId(lawyerId),
+      status: { $in: ['confirmed', 'completed'] }
+    })
+      .populate('userId', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+
+    const data = bookings.map(b => ({
+      id: String(b._id),
+      clientName: [b.userId?.firstName, b.userId?.lastName].filter(Boolean).join(' ') || 'Unknown',
+      amount: typeof b.paymentAmountPaise === 'number' ? Number(b.paymentAmountPaise) / 100 : 0,
+      date: b.confirmedAt || b.createdAt,
+      status: b.paymentStatus || b.status,
+      transactionId: b.paymentId || '-'
+    }));
+
+    return res.json({ success: true, data });
+  } catch (err) {
+    console.error('listPayments error:', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch payments' });
+  }
+};
 

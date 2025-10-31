@@ -39,7 +39,7 @@ export const useLawyers = (type: 'admin' | 'public' = 'public') => {
       setError(null);
       
       const endpoint = type === 'admin' ? '/api/lawyers/all' : '/api/lawyers/approved';
-      const response = await fetch(`http://localhost:5000${endpoint}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}${endpoint}`, {
         headers: type === 'admin' ? {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         } : {}
@@ -65,7 +65,7 @@ export const useLawyers = (type: 'admin' | 'public' = 'public') => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/lawyers/stats', {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyers/stats`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -84,7 +84,7 @@ export const useLawyers = (type: 'admin' | 'public' = 'public') => {
 
   const updateLawyerStatus = async (lawyerId: string, status: 'pending' | 'approved' | 'rejected') => {
     try {
-      const response = await fetch(`http://localhost:5000/api/lawyers/${lawyerId}/status`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyers/${lawyerId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -126,7 +126,7 @@ export const useLawyers = (type: 'admin' | 'public' = 'public') => {
 
   const deleteLawyer = async (lawyerId: string) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/lawyers/${lawyerId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyers/${lawyerId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

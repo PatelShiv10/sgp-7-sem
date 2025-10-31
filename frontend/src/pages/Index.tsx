@@ -70,13 +70,7 @@ const Index = () => {
       title: "Find a Lawyer",
       description: "Connect with qualified lawyers in your area based on specialization and reviews",
       link: "/find-lawyer"
-    },
-    {
-      icon: Video,
-      title: "Video Consultation",
-      description: "Schedule and conduct secure video calls with legal professionals",
-      link: "/find-lawyer"
-    }
+    }, 
   ];
 
   const testimonials = [
@@ -185,7 +179,7 @@ const Index = () => {
             <p className="text-xl text-gray-600">Comprehensive legal assistance at your fingertips</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
               <Card key={index} className="shadow-soft border-0 hover:shadow-lg transition-shadow duration-300 flex flex-col h-full">
                 <CardContent className="p-6 text-center flex flex-col flex-grow">

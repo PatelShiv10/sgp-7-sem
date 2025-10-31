@@ -84,7 +84,7 @@ const LawyerMessages = () => {
       if (!lawyerId) return;
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch('http://localhost:5000/api/chat/conversations', {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/chat/conversations`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) throw new Error('Failed to load conversations');
@@ -114,7 +114,7 @@ const LawyerMessages = () => {
         const token = localStorage.getItem('token');
         const params = new URLSearchParams({ lawyerId, userId: selectedUserId });
         const res = await fetch(
-          `http://localhost:5000/api/chat/conversation?${params.toString()}`,
+          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/chat/conversation?${params.toString()}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -126,7 +126,7 @@ const LawyerMessages = () => {
         // refresh list
         try {
           const listRes = await fetch(
-            'http://localhost:5000/api/chat/conversations',
+            `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/chat/conversations`,
             {
               headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
             }
@@ -232,7 +232,7 @@ const LawyerMessages = () => {
       console.log(`Deleting message with ID: ${messageToDelete._id}`);
       
       // Make the DELETE request
-      const response = await fetch(`http://localhost:5000/api/chat/message/${messageToDelete._id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/chat/message/${messageToDelete._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -294,7 +294,7 @@ const LawyerMessages = () => {
     setMessage('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/chat/message', {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/chat/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -61,7 +61,7 @@ const LawyerFeedbackList: React.FC<LawyerFeedbackListProps> = ({
       else setLoadingMore(true);
 
       const response = await fetch(
-        `http://localhost:5000/api/lawyer-feedback/lawyer/${lawyerId}?page=${pageNum}&limit=${limit}`
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyer-feedback/lawyer/${lawyerId}?page=${pageNum}&limit=${limit}`
       );
       
       const data = await response.json();
@@ -91,7 +91,7 @@ const LawyerFeedbackList: React.FC<LawyerFeedbackListProps> = ({
   const handleMarkHelpful = async (reviewId: string) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/lawyer-feedback/${reviewId}/helpful`,
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/lawyer-feedback/${reviewId}/helpful`,
         { method: 'PUT' }
       );
       
