@@ -401,7 +401,7 @@ const Signup = () => {
 
                       <div>
                         <Label htmlFor="barNumber" className="text-sm font-medium text-gray-700">
-                          Bar Number
+                          Bar Council Number
                         </Label>
                         <Input
                           id="barNumber"
@@ -409,7 +409,7 @@ const Signup = () => {
                           value={barNumber}
                           onChange={(e) => setBarNumber(e.target.value)}
                           className="mt-1"
-                          placeholder="Enter bar number"
+                          placeholder="e.g. KA/1234/2016"
                           required
                         />
                       </div>

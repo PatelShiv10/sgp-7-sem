@@ -16,14 +16,11 @@ const LawyerSettings = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       <LawyerSidebar currentPage={currentPage} setCurrentPage={setCurrentPage} />
-      
       <div className="flex-1 flex flex-col">
         <LawyerTopBar />
-        
         <main className="flex-1 p-4 lg:p-6">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-2xl lg:text-3xl font-bold text-navy mb-6">Settings</h1>
-
             <div className="space-y-6">
               {/* Account Settings */}
               <Card className="shadow-soft border-0">
@@ -40,14 +37,13 @@ const LawyerSettings = () => {
                     </label>
                     <Input type="email" defaultValue="sarah.smith@law.com" />
                   </div>
-                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Current Password
                     </label>
                     <div className="relative">
                       <Input 
-                        type={showPassword ? "text" : "password"} 
+                        type={showPassword ? 'text' : 'password'} 
                         placeholder="Enter current password" 
                       />
                       <Button
@@ -61,20 +57,17 @@ const LawyerSettings = () => {
                       </Button>
                     </div>
                   </div>
-                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       New Password
                     </label>
                     <Input type="password" placeholder="Enter new password" />
                   </div>
-                  
                   <Button className="bg-teal hover:bg-teal-light text-white">
                     Update Password
                   </Button>
                 </CardContent>
               </Card>
-
               {/* Notification Settings */}
               <Card className="shadow-soft border-0">
                 <CardHeader>
@@ -91,7 +84,6 @@ const LawyerSettings = () => {
                     </div>
                     <Switch defaultChecked />
                   </div>
-                  
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-medium">SMS Notifications</h3>
@@ -99,7 +91,6 @@ const LawyerSettings = () => {
                     </div>
                     <Switch />
                   </div>
-                  
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-medium">Appointment Reminders</h3>
@@ -107,7 +98,6 @@ const LawyerSettings = () => {
                     </div>
                     <Switch defaultChecked />
                   </div>
-                  
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-medium">New Message Alerts</h3>
@@ -117,7 +107,6 @@ const LawyerSettings = () => {
                   </div>
                 </CardContent>
               </Card>
-
             </div>
           </div>
         </main>

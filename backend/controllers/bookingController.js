@@ -58,9 +58,9 @@ exports.getExpandedSlots = async (req, res) => {
       const dateStr = `${yyyy}-${mm}-${dd}`;
       const dayName = dayNames[d.getDay()];
       const daySchedule = (lawyer.availability || []).find(x => x.day === dayName);
-      let slots = expandDaySlots(daySchedule, 30);
+    let slots = expandDaySlots(daySchedule, 30);
 
-      if (slots.length > 0) {
+    if (slots.length > 0) {
         // Exclude already booked slots
         const bookings = await Booking.find({ 
           lawyerId, 
@@ -68,7 +68,17 @@ exports.getExpandedSlots = async (req, res) => {
           status: { $in: ['pending', 'confirmed'] } 
         }).select('start');
         const bookedSet = new Set(bookings.map(b => b.start));
-        slots = slots.filter(s => !bookedSet.has(s));
+      slots = slots.filter(s => !bookedSet.has(s));
+      // If date is today, remove times already passed
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (dateStr === todayStr) {
+        const now = new Date();
+        const nowMins = now.getHours() * 60 + now.getMinutes();
+        slots = slots.filter(t => {
+          const [h, m] = t.split(':').map(Number);
+          return h * 60 + m >= nowMins;
+        });
+      }
       }
 
       results.push({ date: dateStr, slots });
@@ -99,11 +109,40 @@ exports.createBooking = async (req, res) => {
     const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     const d = new Date(date + 'T00:00:00');
     if (Number.isNaN(d.getTime())) return res.status(400).json({ success: false, message: 'Invalid date' });
+    // Reject past dates
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const cmp = new Date(d);
+    if (cmp < today) {
+      return res.status(400).json({ success: false, message: 'Cannot book past dates' });
+    }
     const dayName = dayNames[d.getDay()];
     const daySchedule = (lawyer.availability || []).find(x => x.day === dayName);
     const validSlots = new Set(expandDaySlots(daySchedule, 30));
-    if (!validSlots.has(start)) {
+    if (validSlots.size > 0 && !validSlots.has(start)) {
       return res.status(400).json({ success: false, message: 'Selected time is not available' });
+    }
+    // If lawyer has no published slots for the day, allow booking on 30-min boundary between 09:00-17:00
+    if (validSlots.size === 0) {
+      const match = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(start);
+      if (!match) return res.status(400).json({ success: false, message: 'Invalid time format' });
+      const [hh, mm] = start.split(':').map(Number);
+      const isBoundary = mm === 0 || mm === 30;
+      const inWindow = hh >= 9 && hh < 17;
+      if (!isBoundary || !inWindow) {
+        return res.status(400).json({ success: false, message: 'Please pick a time on 30-min boundary between 09:00 and 17:00' });
+      }
+    }
+
+    // If booking is for today, ensure time is not in the past
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (date === todayStr) {
+      const [h, m] = start.split(':').map(Number);
+      const now = new Date();
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+      if (h * 60 + m < nowMins) {
+        return res.status(400).json({ success: false, message: 'Cannot book a past time' });
+      }
     }
 
     // Calculate end time based on start and duration
@@ -137,5 +176,28 @@ exports.createBooking = async (req, res) => {
     }
     console.error('Error creating booking:', error);
     res.status(500).json({ success: false, message: 'Failed to create booking' });
+  }
+};
+
+exports.getBookingById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    const booking = await Booking.findById(id)
+      .populate('lawyerId', 'firstName lastName')
+      .populate('userId', 'firstName lastName');
+    if (!booking) return res.status(404).json({ success: false, message: 'Booking not found' });
+    // Ensure the authenticated user is either the client or the lawyer
+    if (userId && booking.userId && booking.lawyerId) {
+      const isClient = String(booking.userId._id) === String(userId);
+      const isLawyer = String(booking.lawyerId._id) === String(userId);
+      if (!isClient && !isLawyer) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+    }
+    res.json({ success: true, data: booking });
+  } catch (error) {
+    console.error('Error fetching booking:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch booking' });
   }
 };

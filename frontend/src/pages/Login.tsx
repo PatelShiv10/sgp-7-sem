@@ -17,6 +17,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [barNumber, setBarNumber] = useState('');
   const [userType, setUserType] = useState('user');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,7 +35,9 @@ const Login = () => {
         body: JSON.stringify({
           email,
           password,
-          role: userType
+          role: userType,
+          // Optional: include barNumber for lawyer logins (backend may ignore)
+          barNumber: userType === 'lawyer' ? barNumber : undefined
         }),
       });
 
@@ -153,6 +156,25 @@ const Login = () => {
                   </button>
                 </div>
               </div>
+
+            {userType === 'lawyer' && (
+              <div>
+                <Label htmlFor="barNumber" className="text-sm font-medium text-gray-700">
+                  Bar Council Number
+                </Label>
+                <div className="mt-1 relative">
+                  <Input
+                    id="barNumber"
+                    type="text"
+                    value={barNumber}
+                    onChange={(e) => setBarNumber(e.target.value)}
+                    className="pl-3"
+                    placeholder="Enter your Bar Council number"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+            )}
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center">

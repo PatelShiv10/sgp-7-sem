@@ -41,6 +41,7 @@ app.use('/api/clients', require('./routes/client'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/documents', require('./routes/document'));
 app.use('/api/documentqa', require('./routes/documentqa'));
+app.use('/api/payments', require('./routes/payment'));
 
 
 const PORT = process.env.PORT || 5000;

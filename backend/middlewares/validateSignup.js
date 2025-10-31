@@ -47,8 +47,9 @@ exports.validateLawyerSignup = [
   body('experience').isInt({ min: 0 }).withMessage('Experience must be a non-negative number'),
   body('location').notEmpty().withMessage('Location is required'),
   body('barNumber')
-    .isAlphanumeric().withMessage('Bar number must be alphanumeric')
-    .isLength({ min: 6 }).withMessage('Bar number must be at least 6 characters'),
+    .trim()
+    .matches(/^[A-Za-z0-9\/\-]{10,}$/)
+    .withMessage('Bar Council number must be at least 10 characters; letters, numbers, "/" and "-" allowed'),
   body('bio').isLength({ min: 10 }).withMessage('Bio must be at least 10 characters'),
   agreeRule,
   (req, res, next) => {

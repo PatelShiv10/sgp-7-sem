@@ -289,6 +289,7 @@ import PublicLawyerProfile from "./pages/PublicLawyerProfile";
 import AppointmentBooking from "./pages/AppointmentBooking";
 import ChatWithLawyer from "./pages/ChatWithLawyer";
 import VideoCall from "./pages/VideoCall";
+import BookingDetails from "./pages/BookingDetails";
 import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -426,12 +427,24 @@ const App = () => (
                 }
               />
               <Route
-                path="/booking/:lawyerId"
+                path="/booking/lawyer/:lawyerId"
                 element={
                   <>
                     <Navbar />
                     <main className="flex-1">
                       <AppointmentBooking />
+                    </main>
+                    <Footer />
+                  </>
+                }
+              />
+              <Route
+                path="/booking/:id"
+                element={
+                  <>
+                    <Navbar />
+                    <main className="flex-1">
+                      <BookingDetails />
                     </main>
                     <Footer />
                   </>

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { ArrowLeft, Clock, CreditCard, CheckCircle, Loader2 } from 'lucide-react';
+import { paymentService } from '@/services/paymentService';
 
 interface PublicLawyer {
   _id: string;
@@ -81,7 +82,31 @@ const AppointmentBooking = () => {
   const availableTimeSlots = useMemo(() => {
     if (!selectedDate) return [] as string[];
     const entry = slots.find(s => s.date === fmtDate(selectedDate));
-    return entry ? entry.slots.map(s => `${s}`) : [];
+    let list = entry ? entry.slots.map(s => `${s}`) : [];
+
+    // If no custom availability, generate default slots 09:00-17:00 (30-min)
+    if (list.length === 0) {
+      for (let h = 9; h < 17; h++) {
+        for (let m = 0; m < 60; m += 30) {
+          const hh = String(h).padStart(2, '0');
+          const mm = String(m).padStart(2, '0');
+          list.push(`${hh}:${mm}`);
+        }
+      }
+    }
+
+    // For today, hide past slots
+    const todayStr = fmtDate(new Date());
+    if (fmtDate(selectedDate) === todayStr) {
+      const now = new Date();
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+      list = list.filter(t => {
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m >= nowMins;
+      });
+    }
+
+    return list;
   }, [selectedDate, slots]);
 
   const disabled = useMemo(() => {
@@ -89,31 +114,109 @@ const AppointmentBooking = () => {
     return (date: Date) => !activeDates.has(fmtDate(date));
   }, [slots]);
 
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) return resolve(true);
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleBookAppointment = async () => {
-    if (!selectedDate || !selectedTime || !caseDescription.trim() || !lawyerId) return;
+    if (!selectedDate || !selectedTime || !lawyerId) {
+      alert('Please select a date and time.');
+      return;
+    }
 
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/bookings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          lawyerId,
-          date: fmtDate(selectedDate),
-          start: selectedTime.split(' ')[0],
-          durationMins: 30,
-          notes: caseDescription
-        })
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Booking failed');
+
+      const ok = await loadRazorpayScript();
+      if (!ok) throw new Error('Failed to load payment gateway. Disable ad blockers and try again.');
+
+      // Amount in paise (e.g., Rs 250 => 25000)
+      const order = await paymentService.createOrder({ amount: 25000, notes: { lawyerId, purpose: 'appointment' } });
+      if (!order?.orderId || !order?.key) {
+        throw new Error('Payment initialization failed. Please check server keys.');
       }
-      setIsBooked(true);
+
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      const options = {
+        key: order.key,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'LawMate',
+        description: 'Consultation Booking',
+        order_id: order.orderId,
+        prefill: user ? {
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+          email: user.email || ''
+        } : undefined,
+        // Restrict to domestic-friendly methods (India): allow UPI, Netbanking, Cards; disable EMI/Paylater/Wallets
+        method: {
+          upi: true,
+          netbanking: true,
+          card: true,
+          wallet: false,
+          emi: false,
+          paylater: false
+        },
+        notes: {
+          purpose: 'appointment',
+          locale: 'IN'
+        },
+        config: {
+          display: {
+            // Prioritize UPI and Netbanking for domestic payments
+            sequence: [ 'upi', 'netbanking', 'card' ],
+          }
+        },
+        handler: async function (response: any) {
+          const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = response || {};
+          // On successful payment, verify and create booking on server
+          const token = localStorage.getItem('token');
+          const res = await fetch('http://localhost:5000/api/payments/verify', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              razorpay_order_id,
+              razorpay_payment_id,
+              razorpay_signature,
+              booking: {
+                lawyerId,
+                date: fmtDate(selectedDate),
+                start: selectedTime.split(' ')[0],
+                durationMins: 30,
+                notes: caseDescription
+              }
+            })
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(err.message || 'Payment verification failed');
+            return;
+          }
+          setIsBooked(true);
+        },
+        modal: {
+          ondismiss: function () {
+            // User closed checkout
+          }
+        },
+        theme: { color: '#14b8a6' }
+      } as any;
+
+      const rz = new (window as any).Razorpay(options);
+      rz.on('payment.failed', function (response: any) {
+        alert(response?.error?.description || 'Payment failed. Please try again.');
+      });
+      rz.open();
     } catch (e) {
       alert((e as Error).message);
     } finally {
@@ -212,7 +315,13 @@ const AppointmentBooking = () => {
                       mode="single"
                       selected={selectedDate}
                       onSelect={setSelectedDate}
-                      disabled={disabled}
+                      disabled={(date) => {
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        const d = new Date(date);
+                        d.setHours(0,0,0,0);
+                        return d < today; // disable past dates
+                      }}
                       month={month}
                       onMonthChange={setMonth}
                       className="rounded-md border border-gray-300"
@@ -252,7 +361,7 @@ const AppointmentBooking = () => {
                       ) : (
                         <div className="text-center py-8 text-gray-500">
                           <p>No available time slots for this date.</p>
-                          <p className="text-sm">Please select a different date.</p>
+                          <p className="text-sm">Please pick another date, or contact the lawyer if no dates are available.</p>
                         </div>
                       )}
                     </div>
@@ -316,14 +425,14 @@ const AppointmentBooking = () => {
                   <div className="space-y-3 pt-4">
                     <Button
                       onClick={handleBookAppointment}
-                      disabled={!selectedDate || !selectedTime || !caseDescription.trim() || isLoading}
+                      disabled={!selectedDate || !selectedTime || isLoading}
                       className="w-full bg-teal hover:bg-teal-light text-white"
                     >
                       <CreditCard className="h-4 w-4 mr-2" />
                       {isLoading ? 'Processing...' : 'Book & Pay'}
                     </Button>
                     <p className="text-xs text-gray-500 text-center">
-                      Payment will be processed securely via Stripe
+                      Payment will be processed securely via Razorpay
                     </p>
                   </div>
                 </CardContent>

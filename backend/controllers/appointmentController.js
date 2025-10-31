@@ -3,6 +3,7 @@ const User = require('../models/User');
 const LawyerFeedback = require('../models/LawyerFeedback');
 const LawyerClient = require('../models/LawyerClient');
 const { validationResult } = require('express-validator');
+const { sendMail } = require('../utils/mailer');
 
 // @desc    Get all appointments for a lawyer
 // @route   GET /api/appointments/lawyer
@@ -378,6 +379,41 @@ const updateAppointmentStatus = async (req, res) => {
       await appointment.save();
     }
 
+    // Populate user and lawyer for email
+    const popAppointment = await Booking.findById(id)
+      .populate('userId', 'firstName lastName email')
+      .populate('lawyerId', 'firstName lastName email');
+    const { userId: user, lawyerId: lawyer } = popAppointment;
+
+    if (status === 'confirmed') {
+      // Send confirmation email to user
+      if (user?.email) {
+        await sendMail({
+          to: user.email,
+          subject: 'Booking Confirmed – LawMate',
+          html: `<p>Hi ${user.firstName},</p><p>Your appointment with ${lawyer.firstName} ${lawyer.lastName} has been <b>confirmed</b>.<br>Date: <b>${popAppointment.date}</b><br>Time: <b>${popAppointment.start}</b>.<br>Thank you for booking with LawMate.</p>`
+        });
+      }
+    } else if (status === 'cancelled') {
+      // Send rejection/refund email to user
+      if (user?.email) {
+        await sendMail({
+          to: user.email,
+          subject: 'Booking Not Approved – Refund Initiated',
+          html: `<p>Hi ${user.firstName},</p><p>We regret to inform you your appointment with ${lawyer.firstName} ${lawyer.lastName} could not be approved and has been <b>cancelled</b>.<br>Any booking payment will be refunded within a week.<br>If you have questions, reply to this email.<br>Thank you for considering LawMate.</p>`
+        });
+      }
+    } else if (status === 'postponed' || status === 'rescheduled') {
+      // Send reschedule notice to user
+      if (user?.email) {
+        await sendMail({
+          to: user.email,
+          subject: 'Appointment Rescheduled – LawMate',
+          html: `<p>Hi ${user.firstName},</p><p>Your appointment with ${lawyer.firstName} ${lawyer.lastName} has been <b>rescheduled</b> by the lawyer. We will notify you of the new date and time as soon as it is determined.</p>`
+        });
+      }
+    }
+
     // Populate and return updated appointment
     const updatedAppointment = await Booking.findById(id)
       .populate('userId', 'firstName lastName email phone')
@@ -501,6 +537,18 @@ const rescheduleAppointment = async (req, res) => {
       .populate('lawyerId', 'firstName lastName')
       .populate('userId', 'firstName lastName email phone')
       .lean();
+
+    const populated = await Booking.findById(id)
+      .populate('userId', 'firstName lastName email')
+      .populate('lawyerId', 'firstName lastName email');
+    const { userId: user, lawyerId: lawyer } = populated;
+    if (user?.email) {
+      await sendMail({
+        to: user.email,
+        subject: 'Appointment Rescheduled – LawMate',
+        html: `<p>Hi ${user.firstName},</p><p>Your appointment with ${lawyer.firstName} ${lawyer.lastName} has been <b>rescheduled</b>.<br>New Date: <b>${populated.date}</b><br>New Time: <b>${populated.start}</b></p>`
+      });
+    }
 
     res.json({
       success: true,
