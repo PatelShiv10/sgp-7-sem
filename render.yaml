@@ -1,0 +1,76 @@
+services:
+  - type: web
+    name: sgp-backend
+    env: node
+    rootDir: backend
+    buildCommand: "npm ci"
+    startCommand: "node server.js"
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      # REQUIRED: set actual values in the Render dashboard after first deploy
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ALLOWED_ORIGINS
+        # Add your frontend URL after it’s created, e.g. https://sgp-frontend.onrender.com
+        value: ""
+      - key: DOCUMENTQA_SERVICE_URL
+        # Fill with the DocumentQA service URL after it’s created, e.g. https://sgp-documentqa.onrender.com
+        value: ""
+      # Optional if used in your project:
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+
+  - type: web
+    name: sgp-documentqa
+    env: python
+    rootDir: Model
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn DocumentQA:app --host 0.0.0.0 --port $PORT"
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false
+
+  - type: web
+    name: sgp-chatbot
+    env: python
+    rootDir: Model
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn Chatbot:app --host 0.0.0.0 --port $PORT"
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false
+      # Optionally expose CORS allowed origin(s) to your Chatbot app if it reads from env:
+      - key: ALLOWED_ORIGINS
+        value: ""
+
+  - type: static
+    name: sgp-frontend
+    rootDir: frontend
+    buildCommand: "npm ci && npm run build"
+    staticPublishPath: "dist"
+    envVars:
+      - key: VITE_API_BASE_URL
+        # Backend base URL, set after backend deploy: e.g. https://sgp-backend.onrender.com
+        value: ""
+      - key: VITE_CHATBOT_API_URL
+        # Chatbot service URL, set after chatbot deploy: e.g. https://sgp-chatbot.onrender.com
+        value: ""

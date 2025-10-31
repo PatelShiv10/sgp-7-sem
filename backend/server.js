@@ -11,7 +11,27 @@ const app = express();
 
 connectDB();
 
-app.use(cors());
+// Configure CORS with optional allowlist from env
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow non-browser or same-origin requests (no Origin header)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -29,6 +49,10 @@ try {
 } catch (e) {
   console.warn('Failed to initialize uploads directory:', e);
 }
+
+app.get("/", (req, res) => {
+  res.send("Backend is running successfully");
+});
 
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/contact', ContactRoutes);

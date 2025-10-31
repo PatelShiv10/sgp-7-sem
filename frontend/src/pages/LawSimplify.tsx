@@ -4,9 +4,17 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+type SimplifyResult = {
+  simplified_explanation?: string;
+  explanation?: string;
+  real_life_example?: string;
+  example?: string;
+  [key: string]: unknown;
+};
+
 const LawSimplify = () => {
   const [legalText, setLegalText] = useState('');
-  const [result, setResult] = useState<any | null>(null);
+  const [result, setResult] = useState<SimplifyResult | null>(null);
   const [language, setLanguage] = useState<'English'|'Hindi'|'Gujarati'>('English');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -15,16 +23,23 @@ const LawSimplify = () => {
 
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/simplify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: legalText })
-      });
+      // const BASE = (import.meta as ImportMeta).env?.VITE_LAWSIMPLIFY_URL || 'https://lawsimplify-vyib.onrender.com';
+      // const res = await fetch(`${BASE}/simplify`, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ text: legalText })
+      // });
+      const BASE = import.meta.env.VITE_LAWSIMPLIFY_URL || 'https://lawsimplify-vyib.onrender.com';
+const res = await fetch(`${BASE}/simplify`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ text: legalText }),
+});
       if (!res.ok) throw new Error('Failed to simplify');
       const data = await res.json();
       let output = data;
       if (language !== 'English') {
-        const tRes = await fetch('http://localhost:8000/translate', {
+        const tRes = await fetch(`${BASE}/translate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ result: data, target_language: language })
@@ -68,7 +83,7 @@ const LawSimplify = () => {
               <label className="text-sm text-gray-700">Translate to:</label>
               <select
                 value={language}
-                onChange={(e) => setLanguage(e.target.value as any)}
+                onChange={(e) => setLanguage(e.target.value as 'English'|'Hindi'|'Gujarati')}
                 className="px-3 py-2 border rounded-md"
               >
                 <option>English</option>
